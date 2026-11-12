@@ -46,7 +46,7 @@ jobs:
           operating_system: freebsd
           version: '15.1'
           run: |
-            sudo pkg install -y rust
+            sudo pkg install -y rust git
             cargo test --release
             cargo build --release
             mkdir out
@@ -63,8 +63,10 @@ jobs:
       - uses: cross-platform-actions/action@v1.7.0
         with:
           operating_system: haiku
+          version: 'r1beta6'
           run: |
-            pkgman install -y rust_bin || pkgman install -y rust
+            pkgman install -y rust_bin git || pkgman install -y rust git
+            rustc --version
             cargo test --release
             cargo build --release
             mkdir out
