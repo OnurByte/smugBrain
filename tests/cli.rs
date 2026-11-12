@@ -87,20 +87,14 @@ fn stale_lock_file_does_not_block() {
 fn crash_recovery() {
     let v = vault("crash");
     smug(&v, &["write", "a.md", "--expect", "new"], "x");
-    let c = rusqlite_free_insert(&v);
-    assert!(c);
+    let c = rusqlite::Connection::open(v.join(".smug/state.db")).unwrap();
+    c.execute("INSERT INTO events(ts,kind,path,hash) VALUES(0,'intent','x.md','deadbeef')", []).unwrap(); // a write that died mid-flight
+    drop(c);
     let (code, out, _) = smug(&v, &["doctor"], "");
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("1 unfinished"), "{out}");
-}
-
-// Insert a dangling intent through the sqlite3 CLI-free route: reuse smug's own DB via a tiny SQL file is not possible,
-// so we simulate a crash with the same schema using the `sqlite3` binary when present; skip otherwise.
-fn rusqlite_free_insert(v: &Path) -> bool {
-    match Command::new("sqlite3").arg(v.join(".smug/state.db")).arg("INSERT INTO events(ts,kind,path,hash) VALUES(0,'intent','x.md','deadbeef')").status() {
-        Ok(s) => s.success(),
-        Err(_) => true, // no sqlite3 binary: nothing to simulate; doctor test below still runs
-    }
+    let (_, out2, _) = smug(&v, &["doctor"], "");
+    assert!(out2.contains("0 unfinished"), "{out2}");
 }
 
 #[test]
