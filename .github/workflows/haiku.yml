@@ -15,3 +15,5 @@ jobs:
             export SMUG_VAULT=/tmp/hv
             ./target/release/smug init /tmp/hv
             echo hi | ./target/release/smug write a.md --expect new; echo "exit=$?"
+            ./target/release/smug search hi; echo "search exit=$?"
+            cargo test --release 2>&1 | grep -E "test result|FAILED|panicked"

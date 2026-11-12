@@ -134,19 +134,50 @@ pub fn no_symlinks(root: &Path, rel: &Path) -> Result<(), String> {
 
 // ---------- OS lock ----------
 /// Advisory lock released by the kernel if the process dies: it can never go stale.
-pub struct Lock(#[allow(dead_code)] fs::File);
+/// shortcut: Haiku's std has no flock, so there we fall back to a lock file that is stolen after 30 s; upgrade if Haiku gains flock support.
+pub struct Lock {
+    _f: Option<fs::File>,
+    file: Option<PathBuf>,
+}
 impl Lock {
     pub fn take(root: &Path, wait_ms: u64) -> Result<Lock, String> {
         fs::create_dir_all(root.join(".smug")).map_err(|e| e.to_string())?;
         let f = fs::OpenOptions::new().create(true).write(true).truncate(false).open(root.join(".smug/lock")).map_err(|e| e.to_string())?;
         for _ in 0..=(wait_ms / 25) {
             match f.try_lock() {
-                Ok(()) => return Ok(Lock(f)),
+                Ok(()) => return Ok(Lock { _f: Some(f), file: None }),
                 Err(fs::TryLockError::WouldBlock) => sleep(Duration::from_millis(25)),
+                Err(fs::TryLockError::Error(e)) if e.kind() == std::io::ErrorKind::Unsupported => return Self::take_by_file(root, wait_ms, 30),
                 Err(fs::TryLockError::Error(e)) => return Err(e.to_string()),
             }
         }
         Err("vault is busy (another smug is running)".into())
+    }
+
+    pub fn take_by_file(root: &Path, wait_ms: u64, stale_secs: u64) -> Result<Lock, String> {
+        let p = root.join(".smug/lock.file");
+        for _ in 0..=(wait_ms / 25) {
+            match fs::OpenOptions::new().write(true).create_new(true).open(&p) {
+                Ok(_) => return Ok(Lock { _f: None, file: Some(p) }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    let age = fs::metadata(&p).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).map(|d| d.as_secs()).unwrap_or(0);
+                    if age >= stale_secs {
+                        let _ = fs::remove_file(&p);
+                    } else {
+                        sleep(Duration::from_millis(25));
+                    }
+                }
+                Err(e) => return Err(e.to_string()),
+            }
+        }
+        Err("vault is busy (another smug is running)".into())
+    }
+}
+impl Drop for Lock {
+    fn drop(&mut self) {
+        if let Some(p) = &self.file {
+            let _ = fs::remove_file(p);
+        }
     }
 }
 
@@ -212,6 +243,21 @@ mod tests {
         assert!(hits(&p, b"password: hunter2hunter2").contains(&"credential-assignment"));
         assert!(hits(&p, b"one two three four five six seven eight nine ten eleven twelve").contains(&"recovery-phrase"));
         assert!(hits(&p, b"just a normal note about passwords").is_empty());
+    }
+    #[test]
+    fn file_lock_fallback() {
+        let d = std::env::temp_dir().join(format!("smug-lock-{}", std::process::id()));
+        fs::create_dir_all(d.join(".smug")).unwrap();
+        let a = Lock::take_by_file(&d, 100, 30).unwrap();
+        assert!(Lock::take_by_file(&d, 100, 30).is_err(), "held lock must block");
+        drop(a);
+        let b = Lock::take_by_file(&d, 100, 30).unwrap();
+        // a crashed holder: file left behind and old enough -> stolen
+        std::mem::forget(b);
+        let f = fs::OpenOptions::new().write(true).open(d.join(".smug/lock.file")).unwrap();
+        f.set_modified(SystemTime::now() - Duration::from_secs(120)).unwrap();
+        assert!(Lock::take_by_file(&d, 100, 30).is_ok());
+        let _ = fs::remove_dir_all(&d);
     }
     #[test]
     fn dates_and_frontmatter() {
