@@ -36,3 +36,7 @@ Not in v1: separate graph DB, always-on daemon, mandatory cloud, new GUI, autono
 Recall@5, MRR, nDCG@5 · false-positive and abstention rate · stale-claim suppression · secret canary, path escape, unauthorised write · crash, concurrency, idempotency, restore · p50/p95 latency, RAM, CPU, context size · cold-session and compaction handoff.
 
 Acceptance gates: zero data loss, zero secret leakage, correct source references, no retrieval regression versus the prototype. Goal: p95 < 250 ms for warm keyword queries on small and medium vaults (a target, not a measurement). The model-backed search never runs on every prompt.
+
+## Status (2026-11-12)
+
+Rust core v0.1 shipped: `init`, `search` (SQLite FTS5, rebuilt per query), `context`, `write` (SHA-256 compare-and-swap, lock, intent/commit journal in SQLite, atomic rename), `log`, `scan` (5 secret patterns), `backup`, `doctor` (reconciles unfinished writes). Everything else in the phase table is not started.
