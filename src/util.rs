@@ -57,7 +57,7 @@ pub fn patterns() -> Pats {
         ("github-token", r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b"),
         ("api-key", r"\b(?:sk-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,})\b"),
         ("credential-assignment", r"(?im)^\s*(?:api[_-]?key|secret|password|passwd|token)\s*[:=]\s*[^\s${}<]{8,}\s*$"),
-        ("credential-assignment", r#"(?m)^\s*(?:export\s+|set\s+|\$env:)?[A-Z][A-Z0-9_]*_(?:API_?KEY|SECRET|PASSWORD|PASSWD|TOKEN)\s*=\s*["']?[^\s"'${}<]{8,}["']?\s*$"#),
+        ("credential-assignment", r#"(?m)^\s*(?:export\s+|set\s+|\$env:)?[A-Z][A-Z0-9_]*_(?:API_?KEY|SECRET|PASSWORD|PASSWD|TOKEN)\s*=\s*["']?[^\s"'${}<]{6,}[^\s"'${}<.]{2}["']?\s*$"#), // value may not end in "..": that is a docs placeholder
         ("recovery-phrase", r"(?m)^[a-z]{2,}(?:[ \t]+[a-z]{2,}){11,23}[ \t]*$"),
     ]
     .into_iter()
@@ -308,6 +308,7 @@ mod tests {
     t!(secret_env_set, assert!(found("credential-assignment", "set STRIPE_SECRET=abcdefgh12345678")));
     t!(clean_env_config_name, assert!(clean("PUBLIC_API_KEY_NAME=my-header-name")));
     t!(clean_env_prefixed_placeholder, assert!(clean("OPENAI_API_KEY=${OPENAI_API_KEY}")));
+    t!(clean_env_ellipsis_placeholder, assert!(clean("OPENROUTER_API_KEY=sk-or-...") && clean("```env\nTELEGRAM_BOT_TOKEN=12345...\n```")));
     t!(clean_env_lowercase_setting, assert!(clean("max_token=1234567890")));
     t!(portable_ok, assert!(portable(Path::new("500-knowledge/ışık/-dash.v2.md")).is_ok() && portable(Path::new("./a.md")).is_ok() && portable(Path::new("console.md")).is_ok()));
     t!(portable_bad_device, assert!(portable(Path::new("CON.md")).is_err() && portable(Path::new("a/lpt1.txt")).is_err() && portable(Path::new("com0.md")).is_ok()));
