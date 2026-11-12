@@ -52,7 +52,7 @@ save("banner.svg", b)
 
 # ---------- 1.2 stats ----------
 rows = [("100%", "of your notes are plain Markdown", 100, "Open, copy, print, or leave any time."),
-        ("420", "automated tests, all green", 0, "Linux, macOS, Windows in CI. FreeBSD and Haiku run them at release."),
+        ("443", "automated tests, all green", 0, "Linux, macOS, Windows in CI. FreeBSD and Haiku run them at release."),
         ("0", "files lost with 8 writers at once", 0, "1 write accepted, 7 refused on hash conflict. Automated test."),
         ("21 ms", "to search 2,000 notes", 0, "Tantivy index, warm. First build 139 ms. Synthetic vault."),
         ("7 MB", "one binary, nothing else to install", 0, "No Python. No Node. No C library. No server. No account.")]
@@ -91,14 +91,14 @@ for i, (lab, vals) in enumerate(rows):
         body += t(x, y + 8, v, 11.5, 700 if j == 0 else 300, PAPER if j == 0 else (GRAY if v.startswith(("—",)) else INK), "middle")
 body += t(100, 716, "Checked 2026-11-12: licenses via the GitHub API, the rest from each project's README. \"—\" = not found there (may live in code or other docs).", 11, 300, GRAY)
 body += t(100, 738, "Where they lead today: community size, live-tested agent integrations (hafiza-os: Claude Code, Codex, Antigravity), built-in semantic search,", 11, 700, INK)
-body += t(100, 754, "and test volume (avenoxbeyin reports 2,316; smug has 420, hafiza-os reports 360). smug --deep hands semantic queries to QMD.", 11, 700, INK)
+body += t(100, 754, "and test volume (avenoxbeyin reports 2,316; smug has 443, hafiza-os reports 360). smug --deep hands semantic queries to QMD.", 11, 700, INK)
 save("card-compare.svg", page(810, "How we compare", "1.2", body))
 
 
 # ---------- badges (our own, not shields.io) ----------
 import re as _re
 VERSION = _re.search(r'^version = "([^"]+)"', (A.parent / "Cargo.toml").read_text(), _re.M).group(1)
-TESTS = 420  # update with every release: cargo test (Unix)
+TESTS = 443  # update with every release: cargo test (Unix)
 badges = [("release", f"v{VERSION}", True), ("tests", f"{TESTS} passing", False), ("license", "public domain", True),
           ("written in", "Rust", False), ("tested on", "Linux macOS Windows FreeBSD Haiku", False), ("speaks", "MCP", True),
           ("needs", "no account, no cloud", False)]

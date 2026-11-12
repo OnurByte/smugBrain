@@ -197,7 +197,7 @@ smug eval --ab --model "claude -p"     # memory on vs memory off: what is it act
 smug apply 1                           # refuses if a question that passed now fails
 ```
 
-Everyday safety: `smug write note.md --expect <sha256|new>` (atomic; refuses if the file changed under you), `smug backup` (scans exactly what is staged, stops on any secret), `smug doctor` (health check, crash recovery, index repair), `smug bench`, `smug receipts` (what each agent session was shown and used). Full list: run `smug` with no arguments.
+Everyday safety: `smug write note.md --expect <sha256|new>` (atomic; refuses if the file changed under you, and refuses a new note whose name would not sync to Windows or macOS), `smug backup` (scans exactly what is staged, stops on any secret), `smug doctor` (health check, crash recovery, index repair), `smug bench`, `smug receipts` (what each agent session was shown and used). Full list: run `smug` with no arguments.
 
 </details>
 
