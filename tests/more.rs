@@ -515,6 +515,11 @@ t!(write_refuses_a_new_note_with_an_unportable_name, {
     let (c, _, e) = smug(&v, &["write", "what?.md", "--expect", "new"], "x");
     assert!(c == 1 && e.contains("portable") && !v.join("what?.md").exists(), "{e}");
 });
+t!(dry_run_names_the_hooks_and_writes_nothing, {
+    let v = vault("dryhk");
+    let o = smug(&v, &["agent", "install", "claude-code", "--dry-run"], "").1;
+    assert!(o.contains("would add smug hooks") && o.contains("PreToolUse") && !v.join(".claude/settings.json").exists() && !v.join(".mcp.json").exists(), "{o}");
+});
 t!(context_lists_active_decisions_not_stale_ones, {
     let v = vault("ctxdec");
     smug(&v, &["decide", "live", "--source", "s", "--title", "Live one"], "x");

@@ -9,7 +9,8 @@ Four ideas adapted from avenoxbeyin 3.13.0, plus the fix that unblocks the relea
 - **The secret guard catches prefixed environment assignments:** `OPENAI_API_KEY=...`, `export DB_PASSWORD=...`, `set X_SECRET=...`, `$env:GITHUB_TOKEN = "..."`. Config names such as `PUBLIC_API_KEY_NAME=` and `${PLACEHOLDER}` values are not flagged.
 - **`smug write` refuses to create a note with a name that cannot travel between machines:** Windows device names (`CON`, `NUL`, `COM1`...), any of `<>:"|?*`, control characters, a trailing dot or space, or a component over 255 bytes. Existing notes are not affected.
 - `smug agent doctor` in a directory that is not a vault now prints `FAIL` and exits 1 every time. It used to die with a broken-pipe error when the server exited before the probe was written, which failed the Linux release build of 1.1.2 (so 1.1.2 never shipped binaries).
-- Tests: 441 (was 427).
+- `smug agent install --dry-run` now also lists the Claude Code hooks and the `AGENTS.md` section it would add; it used to show only the MCP config and the skill.
+- Tests: 442 (was 427).
 
 ## 1.1.2 (2026-11-12)
 

@@ -15,6 +15,41 @@
 
 Better than your brain. Objectively.
 
+## See it work
+
+Output from a real run, trimmed to the lines that matter. Your agent decided on Postgres in March and you moved to CockroachDB in June. Most memory tools keep handing the agent the March note. smug does not:
+
+```console
+$ smug decide postgres --source adr-7 --topic db --files src/database.rs < why.txt
+$ smug check postgres
+CURRENT  postgres  source: adr-7
+
+$ smug patch postgres --new-id cockroach --source adr-9 < why-we-moved.txt
+Memory Patch #1: postgres -> cockroach  (proposed, nothing applied)
+
+$ smug apply 1
+FIXED     before fail after pass which database do we use
+1 case(s), 0 regression(s)
+applied patch 1: postgres superseded by cockroach
+
+$ smug check postgres
+STALE  postgres  superseded by cockroach on 2026-11-12
+```
+
+From here on `smug search` and the agent's `smug_recall` never return the Postgres note again; `smug search --history` and `smug at <date>` still can.
+
+And when a fix has already failed once, the agent hears about it at the moment it opens that file, not three hours later:
+
+```console
+$ smug fail pool-cache --method "cache the pool" --reason "leaked connections" --file src/database.rs
+$ smug warn "let's cache the pool"
+WARN pool-cache: 'cache the pool' failed before because leaked connections (...)
+
+# what Claude Code is told before it edits src/database.rs:
+smug memory for src/database.rs (check before editing; the code may have changed):
+- FAILED BEFORE [pool-cache] cache the pool: leaked connections (verified: no) [UNSUPPORTED]
+```
+
 ## Install
 
 ### Prompt install
@@ -62,7 +97,20 @@ cd my-brain
 smug agent install detected # connects every supported tool it finds on this computer
 ```
 
-Restart your coding tool, then ask it: *"Use smug to recall what we decided about the database."* Nothing is overwritten: smug merges one entry into each tool's config, refuses files it cannot parse, and `--dry-run` shows what it would do first.
+Restart your coding tool, then ask it: *"Use smug to recall what we decided about the database."* Nothing is overwritten: smug merges one entry into each tool's config, refuses files it cannot parse, and `--dry-run` shows what it would do first, including the Claude Code hooks it would add.
+
+### Already have an Obsidian vault?
+
+Skip `smug init` (it refuses a folder that is not empty, so it cannot overwrite your notes). smug works in any folder that has an `850-companion/` directory:
+
+```bash
+cd my-existing-vault
+printf '.smug/\n.secrets/*\n' >> .gitignore   # index and secrets stay off GitHub
+smug doctor                                    # tells you what is missing
+smug agent install claude-code --dry-run       # read it, then run it without --dry-run
+```
+
+Your own hooks and settings stay where they are. At session start smug reads `850-companion/Rules.md` (or `Kurallar.md`), `Core.md`, `Last-Session.md` and `Threads.md`, in that order of priority, and stays under 9,500 characters, below the point where Claude Code cuts a session-start message: rules, identity, the newest handoff card and open threads arrive first, older sessions last.
 
 ### Works with
 
@@ -170,7 +218,7 @@ Everyday safety: `smug write note.md --expect <sha256|new>` (atomic; refuses if 
 
 **What if smug crashes halfway through a change?** Every step is journalled and idempotent. `smug doctor` (or re-running `smug apply`) finishes an interrupted apply; a damaged search index is rebuilt from the Markdown automatically.
 
-**Is it safe to back up?** `smug backup` scans exactly what is staged and stops on private keys, tokens, API keys, `password:` lines and recovery phrases. Anything secret-shaped belongs in `.secrets/`, which is never committed or indexed.
+**Is it safe to back up?** `smug backup` scans exactly what is staged and stops on private keys, tokens, API keys, `password:` lines, environment assignments such as `OPENAI_API_KEY=...` or `export DB_PASSWORD=...`, and recovery phrases. Anything secret-shaped belongs in `.secrets/`, which is never committed or indexed.
 
 **Is it really a single binary?** Yes: pure Rust (redb for state, Tantivy for search), no Python, no Node, no C library, no server.
 
@@ -192,7 +240,7 @@ Markdown notes. State in [redb](https://github.com/cberner/redb), search in [Tan
 - `bench` and `eval` run on your own cases; there is no independent public benchmark.
 - Hooks are installed for Claude Code only; Codex has hooks of its own that smug does not wire yet. Other tools get the MCP tools.
 - Automatic feedback is a heuristic: a surfaced note counts as used when its file name appears in what the assistant wrote or did.
-- Only Codex CLI and OpenCode were live-tested (one session each); see "What supported means here".
+- Only Codex CLI and OpenCode were live-tested over MCP (one session each); see "What supported means here". In Claude Code the prompt hook and the skill were seen working in a real session (Linux, 2026-11-12); its MCP tools were not exercised in that session.
 
 </details>
 

@@ -251,13 +251,19 @@ pub fn agent(root: &Path, a: &[String]) -> R {
                         println!("{:<12} {}", "", install_skill(root, dry, true));
                     } else {
                         println!("{:<12} {}", "", install_skill(root, dry, false));
-                        if !dry {
+                        if dry {
+                            println!("{:<12} (dry run) would add smug hooks to {}: SessionStart, UserPromptSubmit, PreToolUse, Stop, SessionEnd, PreCompact (other hooks kept)", "", root.join(".claude/settings.json").display());
+                        } else {
                             crate::cmds::setup(root, &["claude".to_string()])?;
                         }
                     }
                 }
-                if ad.id == "codex" && !remove && !dry && !matches!(o, Outcome::Refused(_)) {
-                    crate::cmds::setup(root, &["codex".to_string()])?;
+                if ad.id == "codex" && !remove && !matches!(o, Outcome::Refused(_)) {
+                    if dry {
+                        println!("{:<12} (dry run) would add a `## smug` section to {} if it has none", "", root.join("AGENTS.md").display());
+                    } else {
+                        crate::cmds::setup(root, &["codex".to_string()])?;
+                    }
                 }
             }
             Ok(if bad > 0 { 1 } else { 0 })
