@@ -1,5 +1,11 @@
 # Contributing
 
+Thanks for helping. Bug reports, test cases, new platform checks and docs fixes are all welcome.
+
+**Quick path:** fork, branch, `cargo test --release`, open a pull request using the template. Open an issue first for anything that changes a command or a file format.
+
+## Build and test
+
 ```bash
 cargo test --release          # 223 tests; they spawn the real binary against temp vaults
 python3 tools/make_cards.py   # regenerate the README cards

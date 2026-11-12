@@ -1,0 +1,20 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes: {label: "`smug --version`", placeholder: "smug 1.0.0"}
+    validations: {required: true}
+  - type: input
+    id: os
+    attributes: {label: "Operating system", placeholder: "Linux x86-64 / macOS arm64 / Windows / FreeBSD / Haiku"}
+    validations: {required: true}
+  - type: textarea
+    id: repro
+    attributes: {label: "Steps to reproduce", description: "Commands you ran, in order. Never paste secrets."}
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: "Expected vs actual"}
+    validations: {required: true}

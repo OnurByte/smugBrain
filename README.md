@@ -110,6 +110,12 @@ Markdown notes. State in [redb](https://github.com/cberner/redb), search in [Tan
 - Codex and Hermes have no native lifecycle hooks in smug.
 - `smug feedback` is recorded by you or your agent, not inferred.
 
+## Contributing
+
+Pull requests, bug reports and test cases are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Good first contributions: a test for a platform quirk, a new secret pattern with a test, an agent adapter.
+
+<a href="https://github.com/OnurByte/smugbrain/graphs/contributors"><img src="https://contrib.rocks/image?repo=OnurByte/smugbrain" alt="Contributors"></a>
+
 ## License
 
 Public domain ([Unlicense](LICENSE)). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md). Design: NASA Graphics Standards Manual NHB 1430.2 (1976).
