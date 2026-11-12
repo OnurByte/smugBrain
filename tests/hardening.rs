@@ -36,6 +36,11 @@ fn run_in(cwd: &Path, args: &[&str], envs: &[(&str, &str)], stdin: &str) -> (i32
     (o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).into(), String::from_utf8_lossy(&o.stderr).into())
 }
 
+/// canonicalize() on Windows returns a verbatim `\\?\` path; smug (rightly) hands tools the plain form.
+fn canon(p: &Path) -> std::path::PathBuf {
+    std::path::PathBuf::from(fs::canonicalize(p).unwrap().to_string_lossy().trim_start_matches(r"\\?\"))
+}
+
 fn is_empty_dir(d: &Path) -> bool {
     fs::read_dir(d).unwrap().next().is_none()
 }
@@ -79,7 +84,7 @@ t!(mcp_serves_the_vault_it_was_given_from_any_directory, {
 t!(mcp_reports_which_vault_it_serves, {
     let v = vault("vm2");
     let r = tool(&v, &[], "smug_recall", json!({"query": "x"}));
-    assert_eq!(Path::new(r["structuredContent"]["vault"].as_str().unwrap()), fs::canonicalize(&v).unwrap());
+    assert_eq!(Path::new(r["structuredContent"]["vault"].as_str().unwrap()), canon(&v));
 });
 t!(mcp_in_a_non_vault_refuses_to_start_and_touches_nothing, {
     let d = tmp("vm3");
@@ -128,13 +133,13 @@ t!(installed_config_carries_the_absolute_vault_path, {
     let v = vault("vi1");
     let got = installed_vault_arg(&v, "cursor", &tmp("vi1h"), ".cursor/mcp.json");
     assert!(Path::new(&got).is_absolute());
-    assert_eq!(Path::new(&got), fs::canonicalize(&v).unwrap());
+    assert_eq!(Path::new(&got), canon(&v));
 });
 t!(installed_toml_carries_the_vault_path, {
     let (v, h) = (vault("vi2"), tmp("vi2h"));
     smug_env(&v, &["agent", "install", "codex", "--global"], "", &[("SMUG_HOME", h.to_str().unwrap())]);
     let t = fs::read_to_string(h.join(".codex/config.toml")).unwrap();
-    assert!(t.contains("--vault") && t.contains(fs::canonicalize(&v).unwrap().to_str().unwrap()), "{t}");
+    assert!(t.contains("--vault") && t.contains(canon(&v).to_str().unwrap()), "{t}");
 });
 t!(vault_path_with_spaces_works_end_to_end, {
     let d = tmp("vi3");
@@ -167,7 +172,7 @@ t!(symlinked_vault_is_resolved_in_the_config, {
     std::os::unix::fs::symlink(&v, &link).unwrap();
     let (c, _, _) = smug_env(&link, &["agent", "install", "cursor"], "", &[("SMUG_HOME", d.to_str().unwrap())]);
     assert_eq!(c, 0);
-    assert_eq!(Path::new(&json_args(&link.join(".cursor/mcp.json"))), fs::canonicalize(&v).unwrap());
+    assert_eq!(Path::new(&json_args(&link.join(".cursor/mcp.json"))), canon(&v));
 });
 t!(agent_doctor_checks_the_vault_from_another_directory, {
     let v = vault("vd1");
@@ -183,7 +188,7 @@ t!(claude_hooks_carry_the_vault_and_the_binary, {
     let v = vault("vh1");
     smug(&v, &["setup", "claude"], "");
     let s = fs::read_to_string(v.join(".claude/settings.json")).unwrap();
-    let canon = fs::canonicalize(&v).unwrap().to_string_lossy().replace('\\', "\\\\");
+    let canon = canon(&v).to_string_lossy().replace('\\', "\\\\");
     assert!(s.contains("--vault") && s.contains(&canon) && s.contains("hook stop") && s.contains("hook pre-edit"), "{s}");
 });
 t!(old_style_hooks_are_upgraded_not_duplicated, {
