@@ -11,7 +11,7 @@ Markdown is the source of truth. SQLite is operational state and an index: it ca
 | Layer | Choice | Why |
 | --- | --- | --- |
 | Engine | Rust | One binary, strong types, safe concurrency |
-| CLI | `clap` | `secbrain` commands |
+| CLI | `clap` | `smug` commands |
 | State + history | SQLite (`rusqlite`) | Transactions, revisions |
 | Fast search | SQLite FTS5 | No extra service |
 | Semantic search | QMD (kept) | Already works; BM25 + vectors + rerank |

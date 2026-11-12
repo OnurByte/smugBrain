@@ -1,6 +1,6 @@
 # Crypto-Anarchy Statement
 
-secBrain is released under the [Unlicense](LICENSE): public domain, no strings.
+smugBrain is released under the [Unlicense](LICENSE): public domain, no strings.
 This file is not a second license. It says what we mean by it.
 
 1. **Your memory is yours.** Notes are plain files on your disk. No account, no vendor, no kill switch.

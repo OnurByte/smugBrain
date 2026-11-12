@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/banner.svg" alt="secBrain" width="880"></p>
+<p align="center"><img src="assets/banner.svg" alt="smugBrain" width="880"></p>
 
 <p align="center"><a href="README.tr.md">Türkçe</a> · <a href="LICENSE">Public domain</a> · <a href="CRYPTO-ANARCHY.md">Crypto-anarchy statement</a></p>
 
-**secBrain** is a second brain for people who work with AI agents and don't want to rent their memory from a company. It is a folder of Markdown notes plus a small toolkit that lets Claude Code, Codex and Hermes remember what you did yesterday, find the right note, and back everything up without leaking secrets.
+**smugBrain** is a second brain that is, frankly, better than yours. It's for people who work with AI agents and don't want to rent their memory from a company. It is a folder of Markdown notes plus a small toolkit that lets Claude Code, Codex and Hermes remember what you did yesterday, find the right note, and back everything up without leaking secrets.
 
 If you can use a text editor, you can use it.
 
@@ -10,7 +10,7 @@ If you can use a text editor, you can use it.
 
 ## Why
 
-Most "AI memory" products keep your notes on someone else's server and break when the company changes its mind. secBrain keeps one source of truth, a folder you own, and treats every index as disposable.
+Most "AI memory" products keep your notes on someone else's server and break when the company changes its mind. smugBrain keeps one source of truth, a folder you own, and treats every index as disposable.
 
 <p align="center"><img src="assets/card-how.svg" alt="How it fits together" width="880"></p>
 
@@ -28,13 +28,13 @@ What we are aiming for next. These are **goals**, not results:
 
 <p align="center"><img src="assets/card-roadmap.svg" alt="Roadmap" width="880"></p>
 
-The plan: keep the Markdown vault and the existing QMD search, add a Rust core (`secbrain` CLI, SQLite for history and indexes), and prove every step with a benchmark before claiming it is better. Details in [docs/roadmap.md](docs/roadmap.md).
+The plan: keep the Markdown vault and the existing QMD search, add a Rust core (`smug` CLI, SQLite for history and indexes), and prove every step with a benchmark before claiming it is better. Details in [docs/roadmap.md](docs/roadmap.md).
 
 ## Start
 
 ```bash
-git clone https://github.com/OnurByte/secBrain.git my-brain
-cd my-brain/template        # the empty vault: folders + rules
+git clone https://github.com/OnurByte/smugBrain.git my-smugbrain
+cd my-smugbrain/template        # the empty vault: folders + rules
 ```
 
 Open `template/` in Obsidian (or any editor). Read `template/CLAUDE.md`, the rules your agent follows. That is the whole setup for now; the automation scripts are still being cleaned before they go public.

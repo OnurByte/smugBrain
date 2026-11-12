@@ -37,15 +37,15 @@ def save(name, svg):
 
 
 # ---------- banner ----------
-b = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 300" width="{W}" height="300" font-family="{FONT}" role="img" aria-label="secBrain">'
+b = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 300" width="{W}" height="300" font-family="{FONT}" role="img" aria-label="smugBrain">'
      f'<rect width="{W}" height="300" fill="{PAPER}"/><rect x=".5" y=".5" width="{W-1}" height="299" fill="none" stroke="#DDD"/>'
      + "".join(f'<circle cx="34" cy="{y}" r="9" fill="{INK}"/>' for y in range(30, 290, 50))
      + f'<svg x="100" y="60" width="190" height="152" viewBox="0 0 1060 845"><rect width="1060" height="845" fill="#fff"/><path fill="{INK}" fill-rule="evenodd" d="{ICON_PATH}"/></svg>'
-     + t(330, 142, "secBrain", 84, 700, INK, extra='letter-spacing="-3"')
+     + t(330, 142, "smugBrain", 78, 700, INK, extra='letter-spacing="-3"')
      + f'<rect x="333" y="156" width="150" height="8" fill="{RED}"/>'
-     + t(330, 196, "A second brain you own. Plain files. No account. No cloud.", 19, 300)
-     + t(330, 222, "Your agents remember. Your notes stay yours.", 19, 300)
-     + t(100, 262, "Markdown vault  ·  Local-first  ·  Public domain", 12, 700)
+     + t(330, 196, "Better than your brain. Objectively.", 19, 300)
+     + t(330, 222, "Plain files. No account. No cloud. Zero humility.", 19, 300)
+     + t(100, 262, "Your agents remember. Your notes stay yours.  ·  Public domain", 12, 700)
      + t(W - 36, 262, "SBH 1.0", 12, 300, anchor="end")
      + f'<line x1="100" y1="240" x2="{W-36}" y2="240" stroke="{INK}"/></svg>\n')
 save("banner.svg", b)
@@ -97,7 +97,7 @@ def box(x, y, w, h, title, sub, red=False):
             + t(x + w / 2, y + 48, sub, 11.5, 300, PAPER if red else GRAY, "middle"))
 
 body = (box(100, 120, 170, 70, "Your agents", "Claude · Codex · Hermes")
-        + box(355, 120, 170, 70, "secBrain CLI", "hooks · recall · capture", True)
+        + box(355, 120, 170, 70, "smug CLI", "hooks · recall · capture", True)
         + box(610, 120, 170, 70, "Markdown vault", "the only source of truth")
         + f'<path d="M270 155H355M525 155H610" stroke="{INK}" stroke-width="2" fill="none"/>'
         + box(355, 250, 170, 70, "Search", "words → meaning → rerank")
