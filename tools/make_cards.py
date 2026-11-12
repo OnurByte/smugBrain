@@ -118,17 +118,43 @@ svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 96" width="{W}
 save("badges.svg", svg)
 
 # ---------- clients ----------
-tiles = [("Claude Code", "MCP + hooks + skill", True), ("Codex CLI", "MCP + AGENTS.md", False), ("Cursor", "MCP", False),
-         ("Gemini CLI", "MCP", False), ("Windsurf", "MCP", False), ("Kiro", "MCP", False),
-         ("VS Code", "MCP", False), ("OpenCode", "MCP", False), ("Zed · Cline", "MCP, paste a snippet", False)]
+LOGOS = Path(__file__).resolve().parent / "logos"
+
+def logo(fname, x, y, size=34):
+    """Inline a real logo (no external reference, so it renders everywhere, GitHub included)."""
+    if not fname:
+        return ""
+    raw = (LOGOS / fname).read_text()
+    inner = re.search(r"<svg[^>]*>(.*)</svg>", raw, re.S).group(1)
+    inner = re.sub(r"<title>.*?</title>", "", inner, flags=re.S)
+    assert "<script" not in inner.lower()
+    return f'<svg x="{x}" y="{y}" width="{size}" height="{size}" viewBox="0 0 24 24" fill="{INK}">{inner}</svg>'
+
+# (name, logo file, tier) tier 0 = `smug agent install` sets it up, 1 = prints a snippet, 2 = same MCP command, add it yourself
+tools = [("Claude Code", "lb-claudecode.svg", 0), ("Codex", "lb-codex.svg", 0), ("Cursor", "lb-cursor.svg", 0), ("Gemini CLI", "lb-gemini.svg", 0),
+         ("Windsurf", "lb-windsurf.svg", 0), ("Kiro", "lb-kiro.svg", 0), ("VS Code", None, 0), ("OpenCode", "lb-opencode.svg", 0),
+         ("Zed", "zedindustries.svg", 1), ("Cline", "lb-cline.svg", 1), ("Copilot", "lb-githubcopilot.svg", 2), ("JetBrains", "jetbrains.svg", 2),
+         ("Roo Code", "lb-roocode.svg", 2), ("Kilo Code", "lb-kilocode.svg", 2), ("Goose", "lb-goose.svg", 2), ("Amp", "lb-amp.svg", 2),
+         ("Warp", "warp.svg", 2), ("Trae", "lb-trae.svg", 2), ("Qwen Code", "lb-qwen.svg", 2), ("Antigravity", "lb-antigravity.svg", 2)]
+bar = {0: RED, 1: INK, 2: "#BBB"}
 body = t(100, 112, "Start a task in one tool. Continue in another. Saved lessons stay with the project.", 13, 700)
-for i, (name, what, hot) in enumerate(tiles):
-    x, y = 100 + (i % 3) * 252, 134 + (i // 3) * 92
-    body += f'<rect x="{x}" y="{y}" width="236" height="78" fill="{RED if hot else PAPER}" stroke="{INK}"/>'
-    body += t(x + 16, y + 34, name, 19, 700, PAPER if hot else INK) + t(x + 16, y + 56, what, 12, 300, PAPER if hot else GRAY)
-x, y = 100, 134 + 3 * 92
-body += f'<rect x="{x}" y="{y}" width="740" height="62" fill="{INK}"/>' + t(x + 16, y + 28, "Any other MCP client", 17, 700, PAPER) + t(x + 16, y + 48, "Point it at the command   smug mcp", 12, 300, PAPER)
-body += t(100, 506, "One command connects what it finds:  smug agent install detected", 13, 700, RED)
-body += t(100, 528, "Tested: how smug edits each tool's config, and the MCP server with a scripted client. A live session in each tool: not yet.", 11, 300, GRAY)
-body += t(100, 544, "Hooks (session start, before-edit reminders, capture) exist for Claude Code only.", 11, 300, GRAY)
-save("card-clients.svg", page(572, "Works with", "1.0", body))
+TW, TH, GAP = 98, 96, 9
+for i, (name, f, tier) in enumerate(tools + [("and more", None, 3)]):
+    x, y = 100 + (i % 7) * (TW + GAP), 134 + (i // 7) * (TH + 10)
+    dash = ' stroke-dasharray="4 3"' if tier == 3 else ""
+    body += f'<rect x="{x}" y="{y}" width="{TW}" height="{TH}" fill="{PAPER}" stroke="{INK}"{dash}/>'
+    if tier < 3:
+        body += f'<rect x="{x}" y="{y}" width="{TW}" height="5" fill="{bar[tier]}"/>'
+        body += logo(f, x + (TW - 34) / 2, y + 20) if f else t(x + TW / 2, y + 45, "{ }", 24, 700, INK, "middle")
+        body += t(x + TW / 2, y + 76, name, 12, 700, INK, "middle")
+    else:
+        body += t(x + TW / 2, y + 48, "+ more", 17, 700, RED, "middle") + t(x + TW / 2, y + 68, "any MCP tool", 11, 300, GRAY, "middle")
+ly = 134 + 3 * (TH + 10) + 18
+for k, (c, txt) in enumerate([(RED, "one command sets it up"), (INK, "prints a snippet to paste"), ("#BBB", "same command, add it in the tool")]):
+    lx = 100 + k * 250
+    body += f'<rect x="{lx}" y="{ly-9}" width="18" height="9" fill="{c}"/>' + t(lx + 26, ly, txt, 11.5, 700)
+body += t(100, ly + 34, "smug agent install detected", 15, 700, RED) + t(318, ly + 34, "connects every tool it finds on your computer.", 13, 300)
+body += t(100, ly + 60, "Any tool that can run an MCP server works with the command  smug mcp.", 12, 300, GRAY)
+body += t(100, ly + 78, "Tested: how smug edits each setup tool's config, and the MCP server with a scripted client. A live session in each tool: not yet.", 11, 300, GRAY)
+body += t(100, ly + 94, "Hooks (session start, before-edit reminders, capture) exist for Claude Code only. Logos identify compatibility, not endorsement.", 11, 300, GRAY)
+save("card-clients.svg", page(ly + 120, "Works with", "1.0", body))
