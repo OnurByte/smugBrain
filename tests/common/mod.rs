@@ -1,7 +1,25 @@
 #![allow(dead_code)]
 use std::{fs, io::Write, path::{Path, PathBuf}, process::{Command, Stdio}};
 
+/// Test dirs are never deleted by the tests themselves; sweep the ones left by earlier runs whose process is gone (Linux).
+fn sweep_old() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let Ok(rd) = fs::read_dir(std::env::temp_dir()) else { return };
+        for e in rd.flatten() {
+            let n = e.file_name().to_string_lossy().to_string();
+            let pid = n.strip_prefix("smug-test-").and_then(|r| r.split('-').next()).and_then(|p| p.parse::<u32>().ok());
+            if let Some(p) = pid {
+                if p != std::process::id() && Path::new("/proc/self").exists() && !Path::new(&format!("/proc/{p}")).exists() {
+                    let _ = fs::remove_dir_all(e.path());
+                }
+            }
+        }
+    });
+}
+
 pub fn tmp(name: &str) -> PathBuf {
+    sweep_old();
     let d = std::env::temp_dir().join(format!("smug-test-{}-{name}", std::process::id()));
     let _ = fs::remove_dir_all(&d);
     fs::create_dir_all(&d).unwrap();

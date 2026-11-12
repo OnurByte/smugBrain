@@ -102,7 +102,8 @@ pub fn retrieve(root: &Path, st: &State, q: &str, k: usize) -> Res<Vec<Hit>> {
 
 fn retrieve_inner(root: &Path, st: &State, q: &str, k: usize) -> Res<Vec<Hit>> {
     refresh(root, st)?;
-    let clean: String = q.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect();
+    // lower-cased so a bare AND / OR / NOT is a word, not a query operator (the tokenizer lower-cases the notes anyway)
+    let clean: String = q.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect::<String>().to_lowercase();
     if clean.trim().is_empty() || k == 0 {
         return Ok(vec![]);
     }

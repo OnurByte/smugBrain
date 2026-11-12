@@ -193,8 +193,15 @@ pub fn transcript_text(tr: &str) -> String {
 pub fn capture_text(st: &State, label: &str, text: &str) -> Res<String> {
     let rel = format!("000-inbox/captures/{}-{}.md", today(), label);
     let path = st.root.join(&rel);
-    let cur = fs::read(&path).ok().map(|d| sha(&d));
-    let body = format!("---\ntype: capture\nstatus: raw\ncaptured_at: {}\n---\n\n{}\n", today(), redact(text));
+    let old = fs::read(&path).ok();
+    let cur = old.as_deref().map(sha);
+    let new = redact(text);
+    let body = match old.as_deref().map(String::from_utf8_lossy) {
+        // pre-compact and session-end share this file: keep what an earlier capture saved instead of overwriting it
+        Some(prev) if prev.contains(&new) => return Ok(rel),
+        Some(prev) => format!("{}\n\n---\n\n{new}\n", prev.trim_end()),
+        None => format!("---\ntype: capture\nstatus: raw\ncaptured_at: {}\n---\n\n{new}\n", today()),
+    };
     write_note(st, Path::new(&rel), body.as_bytes(), Some(cur.as_deref().unwrap_or("new")))??;
     Ok(rel)
 }

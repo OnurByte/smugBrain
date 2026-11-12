@@ -54,6 +54,15 @@ pub fn valid_id(id: &str) -> Res<()> {
     Ok(())
 }
 
+/// Dates are compared as strings (`smug at`), so only YYYY-MM-DD is allowed.
+pub fn valid_date(d: &str) -> Res<()> {
+    let b = d.as_bytes();
+    if b.len() != 10 || b[4] != b'-' || b[7] != b'-' || !d.chars().enumerate().all(|(i, c)| i == 4 || i == 7 || c.is_ascii_digit()) {
+        return Err(format!("bad date '{d}': use YYYY-MM-DD").into());
+    }
+    Ok(())
+}
+
 pub fn fm_note(ty: &str, id: &str, extra: &[(&str, String)], body: &str) -> String {
     let mut s = format!("---\ntype: {ty}\nid: {id}\n");
     for (k, v) in extra {
@@ -82,6 +91,8 @@ pub fn decide(root: &Path, a: &[String]) -> R {
     valid_id(id)?;
     let source = opt(a, "--source").ok_or("--source is required: a decision without a source is UNSUPPORTED")?;
     let d = opt(a, "--date").unwrap_or_else(today);
+    valid_date(&d)?;
+    valid_date(&opt(a, "--known-at").unwrap_or_else(today))?;
     let extra = [
         ("title", opt(a, "--title").unwrap_or_else(|| id.clone())),
         ("status", "active".into()),
@@ -202,7 +213,7 @@ pub fn impact_of(notes: &[Note], id: &str) -> Vec<(String, usize)> {
                 if seen.contains(&k) {
                     continue;
                 }
-                let dep = list(n.get("depends_on")).iter().any(|d| d == cur) || n.body.contains(&format!("[[{cur}]]")) || n.body.contains(&format!("[[{cur}|"));
+                let dep = list(n.get("depends_on")).iter().any(|d| d == cur) || n.body.contains(&format!("[[{cur}]]")) || n.body.contains(&format!("[[{cur}|")) || n.body.contains(&format!("[[{cur}#"));
                 if dep {
                     seen.insert(k.clone());
                     out.push((n.rel.clone(), depth));
@@ -296,8 +307,10 @@ pub fn patch(root: &Path, a: &[String]) -> R {
     if on.status() != "active" {
         return Err("that decision is already superseded".into());
     }
+    valid_date(&opt(a, "--date").unwrap_or_else(today))?;
     let impacted = impact_of(&notes, old);
-    let n = fs::read_dir(root.join("patches")).map(|d| d.flatten().count()).unwrap_or(0) + 1;
+    // highest existing number + 1: counting files collides with a later patch as soon as an earlier one is deleted
+    let n = fs::read_dir(root.join("patches")).map(|d| d.flatten().filter_map(|e| e.path().file_stem()?.to_str()?.parse::<usize>().ok()).max().unwrap_or(0)).unwrap_or(0) + 1;
     let p = json!({"n": n, "old": old, "new_id": new_id, "source": source, "topic": opt(a, "--topic").unwrap_or_else(|| on.get("topic").to_string()),
         "title": opt(a, "--title").unwrap_or_else(|| new_id.clone()), "valid_from": opt(a, "--date").unwrap_or_else(today), "body": stdin_text().trim(),
         "impacted": impacted.iter().map(|(p, d)| json!({"path": p, "depth": d})).collect::<Vec<_>>(), "status": "proposed"});

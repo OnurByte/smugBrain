@@ -4,6 +4,10 @@ use std::{fs, io::Write, path::Path};
 
 /// Outer Err = refused or failed. Inner Err = conflict (someone changed the file); Ok = new sha256.
 pub fn write_note(st: &State, rel: &Path, data: &[u8], expect: Option<&str>) -> Res<Result<String, String>> {
+    // the secret scan treats a NUL in the first 8 KB as "binary" and skips the file: a note must not be able to use that to hide a secret
+    if data.iter().take(8192).any(|&b| b == 0) {
+        return Err("content has NUL bytes: notes are text".into());
+    }
     if !hits(&patterns(), data).is_empty() {
         return Err("content looks like a secret; put it in .secrets/ by hand".into());
     }

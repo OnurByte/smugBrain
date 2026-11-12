@@ -193,7 +193,7 @@ pub type Fm = std::collections::HashMap<String, String>;
 /// Splits `---\nkey: value\n---\nbody`. No frontmatter -> empty map and the whole text.
 pub fn split_fm(text: &str) -> (Fm, &str) {
     let mut m = Fm::new();
-    let Some(rest) = text.strip_prefix("---\n") else { return (m, text) };
+    let Some(rest) = text.strip_prefix("---\n").or_else(|| text.strip_prefix("---\r\n")) else { return (m, text) }; // CRLF: git autocrlf on Windows
     let Some(end) = rest.find("\n---") else { return (m, text) };
     for l in rest[..end].lines() {
         if let Some((k, v)) = l.split_once(':') {
@@ -211,7 +211,7 @@ pub fn list(v: &str) -> Vec<String> {
 /// Sets `key: val` in the frontmatter (adds a frontmatter block if missing).
 pub fn set_fm(text: &str, key: &str, val: &str) -> String {
     let line = format!("{key}: {val}");
-    let Some(rest) = text.strip_prefix("---\n") else { return format!("---\n{line}\n---\n{text}") };
+    let Some(rest) = text.strip_prefix("---\n").or_else(|| text.strip_prefix("---\r\n")) else { return format!("---\n{line}\n---\n{text}") };
     let Some(end) = rest.find("\n---") else { return text.to_string() };
     let (head, tail) = rest.split_at(end);
     let mut done = false;

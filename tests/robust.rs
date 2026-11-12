@@ -229,3 +229,73 @@ t!(stop_hook_clears_the_surfaced_list_so_it_credits_once, {
 });
 t!(stop_hook_survives_garbage_input, assert_eq!(smug(&vault("s6"), &["hook", "stop"], "not json at all").0, 0));
 t!(hook_unknown_subcommand_errors, assert_eq!(smug(&vault("s7"), &["hook", "nope"], "").0, 1));
+
+// --- round 1 regressions
+#[test]
+fn bare_query_operators_are_words_not_syntax_errors() {
+    let v = common::vault("r1-ops");
+    std::fs::write(v.join("500-knowledge/a.md"), "this and that or not").unwrap();
+    for q in ["AND", "OR", "NOT", "foo NOT", "AND foo"] {
+        assert_eq!(common::smug(&v, &["search", q], "").0, 0, "query {q}");
+    }
+    assert!(!v.join(".smug/state.redb.corrupt").exists());
+}
+
+#[test]
+fn crlf_frontmatter_is_read() {
+    let v = common::vault("r1-crlf");
+    common::smug(&v, &["decide", "db", "--source", "adr"], "why");
+    let p = v.join("500-knowledge/decisions/db.md");
+    let t = std::fs::read_to_string(&p).unwrap().replace('\n', "\r\n");
+    std::fs::write(&p, t).unwrap();
+    assert!(common::smug(&v, &["check", "db"], "").1.starts_with("CURRENT"));
+}
+
+#[test]
+fn heading_link_counts_as_dependency() {
+    let v = common::vault("r1-impact");
+    common::smug(&v, &["decide", "db", "--source", "adr"], "why");
+    std::fs::write(v.join("500-knowledge/dep.md"), "see [[db#why]]").unwrap();
+    assert!(common::smug(&v, &["impact", "db"], "").1.contains("dep.md"));
+}
+
+#[test]
+fn bad_dates_are_refused() {
+    let v = common::vault("r1-date");
+    assert_ne!(common::smug(&v, &["decide", "d", "--source", "s", "--date", "tomorrow"], "w").0, 0);
+    assert_ne!(common::smug(&v, &["decide", "d", "--source", "s", "--known-at", "2026-1-1"], "w").0, 0);
+    assert_eq!(common::smug(&v, &["decide", "d", "--source", "s", "--date", "2026-11-12"], "w").0, 0);
+}
+
+#[test]
+fn patch_numbers_survive_a_deleted_earlier_patch() {
+    let v = common::vault("r1-patch");
+    common::smug(&v, &["decide", "db", "--source", "adr"], "why");
+    for i in 1..=3 {
+        assert_eq!(common::smug(&v, &["patch", "db", "--new-id", &format!("n{i}"), "--source", "s"], "x").0, 0);
+    }
+    std::fs::remove_file(v.join("patches/001.json")).unwrap();
+    let (c, o, _) = common::smug(&v, &["patch", "db", "--new-id", "m", "--source", "s"], "y");
+    assert_eq!(c, 0, "{o}");
+    assert!(v.join("patches/004.json").exists());
+}
+
+#[test]
+fn nul_byte_cannot_hide_a_secret_from_the_write_guard() {
+    let v = common::vault("r2-nul");
+    let (c, _, e) = common::smug(&v, &["write", "x.md", "--expect", "new"], "\0password: hunter2hunter2\n");
+    assert_ne!(c, 0, "{e}");
+    assert!(!v.join("x.md").exists());
+}
+
+#[test]
+fn a_second_capture_keeps_the_first() {
+    let v = common::vault("r3-cap");
+    common::smug(&v, &["capture", "--label", "s"], "early part of the session");
+    common::smug(&v, &["capture", "--label", "s"], "late part of the session");
+    common::smug(&v, &["capture", "--label", "s"], "late part of the session"); // same text again: no duplicate
+    let f = std::fs::read_dir(v.join("000-inbox/captures")).unwrap().flatten().next().unwrap().path();
+    let t = std::fs::read_to_string(f).unwrap();
+    assert!(t.contains("early part") && t.contains("late part"));
+    assert_eq!(t.matches("late part").count(), 1);
+}
