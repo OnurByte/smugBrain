@@ -57,6 +57,7 @@ pub fn patterns() -> Pats {
         ("github-token", r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b"),
         ("api-key", r"\b(?:sk-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{20,})\b"),
         ("credential-assignment", r"(?im)^\s*(?:api[_-]?key|secret|password|passwd|token)\s*[:=]\s*[^\s${}<]{8,}\s*$"),
+        ("credential-assignment", r#"(?m)^\s*(?:export\s+|set\s+|\$env:)?[A-Z][A-Z0-9_]*_(?:API_?KEY|SECRET|PASSWORD|PASSWD|TOKEN)\s*=\s*["']?[^\s"'${}<]{8,}["']?\s*$"#),
         ("recovery-phrase", r"(?m)^[a-z]{2,}(?:[ \t]+[a-z]{2,}){11,23}[ \t]*$"),
     ]
     .into_iter()
@@ -124,6 +125,18 @@ pub fn safe_rel(p: &str) -> Result<PathBuf, String> {
         return Err(format!("refusing path '{p}' (escapes vault or reserved)"));
     }
     Ok(pb)
+}
+
+/// A NEW note must be nameable on Windows, macOS and Linux alike, or the vault stops syncing between machines.
+pub fn portable(rel: &Path) -> Result<(), String> {
+    for c in rel.components().filter_map(|c| c.as_os_str().to_str()) {
+        let stem = c.split('.').next().unwrap_or("").to_ascii_uppercase();
+        let device = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL") || (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.ends_with(|d: char| d.is_ascii_digit() && d != '0'));
+        if device || c.len() > 255 || c.ends_with(['.', ' ']) && c != "." || c.chars().any(|ch| ch.is_control() || "<>:\"|?*".contains(ch)) {
+            return Err(format!("refusing new note '{}': '{c}' is not a portable file name (Windows device name, one of <>:\"|?*, trailing dot or space, or too long)", rel.display()));
+        }
+    }
+    Ok(())
 }
 
 /// Every existing component of `rel` under `root` must be a real file or directory.
@@ -289,6 +302,17 @@ mod tests {
     t!(clean_markdown_heading, assert!(clean("# Secrets handling\n\nWe never store them.")));
 
     // --- path safety
+    t!(secret_env_prefixed, assert!(found("credential-assignment", "OPENAI_API_KEY=abcdefgh12345678")));
+    t!(secret_env_export, assert!(found("credential-assignment", "export DB_PASSWORD='hunter2hunter2'")));
+    t!(secret_env_powershell, assert!(found("credential-assignment", "$env:GITHUB_TOKEN = \"abcdefgh12345678\"")));
+    t!(secret_env_set, assert!(found("credential-assignment", "set STRIPE_SECRET=abcdefgh12345678")));
+    t!(clean_env_config_name, assert!(clean("PUBLIC_API_KEY_NAME=my-header-name")));
+    t!(clean_env_prefixed_placeholder, assert!(clean("OPENAI_API_KEY=${OPENAI_API_KEY}")));
+    t!(clean_env_lowercase_setting, assert!(clean("max_token=1234567890")));
+    t!(portable_ok, assert!(portable(Path::new("500-knowledge/ışık/-dash.v2.md")).is_ok() && portable(Path::new("./a.md")).is_ok() && portable(Path::new("console.md")).is_ok()));
+    t!(portable_bad_device, assert!(portable(Path::new("CON.md")).is_err() && portable(Path::new("a/lpt1.txt")).is_err() && portable(Path::new("com0.md")).is_ok()));
+    t!(portable_bad_chars, assert!(portable(Path::new("what?.md")).is_err() && portable(Path::new("a:b.md")).is_err() && portable(Path::new("x/tab\tname.md")).is_err()));
+    t!(portable_bad_trailing, assert!(portable(Path::new("note.")).is_err() && portable(Path::new("dir /a.md")).is_err()));
     t!(path_ok_simple, assert!(safe_rel("a.md").is_ok()));
     t!(path_ok_nested, assert!(safe_rel("a/b/c.md").is_ok()));
     t!(path_ok_vault_dir, assert!(safe_rel("500-knowledge/x.md").is_ok()));

@@ -494,6 +494,27 @@ t!(context_is_capped, {
     fs::write(v.join("850-companion/Core.md"), "x".repeat(20000)).unwrap();
     assert!(smug(&v, &["context"], "").1.chars().count() <= 9500);
 });
+t!(context_keeps_rules_and_the_newest_card_when_old_sessions_are_long, {
+    let v = vault("ctxpri");
+    fs::write(v.join("850-companion/Rules.md"), "RULE-ONE").unwrap();
+    fs::write(v.join("850-companion/Threads.md"), "THREAD-OPEN").unwrap();
+    fs::write(v.join("850-companion/Last-Session.md"), format!("# Last Session\n\n## Session: new\nNEWEST-CARD\n\n## Session: old\n{}\n", "y".repeat(20000))).unwrap();
+    let o = smug(&v, &["context"], "").1;
+    assert!(o.contains("RULE-ONE") && o.contains("NEWEST-CARD") && o.contains("THREAD-OPEN") && o.contains("## Core"), "{}", &o[..400.min(o.len())]);
+    assert!(o.find("RULE-ONE") < o.find("NEWEST-CARD") && o.find("THREAD-OPEN") < o.find("## Earlier sessions"));
+    assert!(o.chars().count() <= 9500);
+});
+t!(context_reads_kurallar_when_there_is_no_rules_file, {
+    let v = vault("ctxkur");
+    fs::remove_file(v.join("850-companion/Rules.md")).unwrap();
+    fs::write(v.join("850-companion/Kurallar.md"), "KURAL-BIR").unwrap();
+    assert!(smug(&v, &["context"], "").1.contains("KURAL-BIR"));
+});
+t!(write_refuses_a_new_note_with_an_unportable_name, {
+    let v = vault("wport");
+    let (c, _, e) = smug(&v, &["write", "what?.md", "--expect", "new"], "x");
+    assert!(c == 1 && e.contains("portable") && !v.join("what?.md").exists(), "{e}");
+});
 t!(context_lists_active_decisions_not_stale_ones, {
     let v = vault("ctxdec");
     smug(&v, &["decide", "live", "--source", "s", "--title", "Live one"], "x");

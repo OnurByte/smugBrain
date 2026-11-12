@@ -79,6 +79,9 @@ pub fn backup(root: &Path) -> R {
 
 pub fn write(root: &Path, a: &[String]) -> R {
     let rel = safe_rel(a.first().ok_or("usage: smug write <note.md> --expect <sha256|new>")?)?;
+    if !root.join(&rel).exists() {
+        portable(&rel)?;
+    }
     let expect = mem::opt(a, "--expect");
     if expect.is_none() && !a.iter().any(|x| x == "--force") {
         return Err("--expect <sha256|new> is required (or --force to overwrite blindly)".into());
@@ -141,16 +144,27 @@ pub fn context(root: &Path) -> R {
     if !is_vault(root) {
         return Ok(0);
     }
-    let mut out = String::new();
-    for f in ["Core", "Rules", "Last-Session", "Threads"] {
-        if let Ok(t) = fs::read_to_string(root.join(format!("850-companion/{f}.md"))) {
-            out.push_str(&format!("## {f}\n{t}\n"));
-        }
-    }
+    let read = |names: &[&str]| names.iter().find_map(|f| fs::read_to_string(root.join(format!("850-companion/{f}.md"))).ok());
+    let last = read(&["Last-Session"]).unwrap_or_default();
+    // The newest handoff card is the first "## " section; older sessions go to the back of the queue.
+    let first = if last.starts_with("## ") { 0 } else { last.find("\n## ").map(|i| i + 1).unwrap_or(0) };
+    let end = last[first..].match_indices("\n## ").next().map(|(i, _)| first + i + 1).unwrap_or(last.len());
     let notes = mem::load_notes(root);
     let act: Vec<String> = notes.iter().filter(|n| n.fm.get("type").map(String::as_str) == Some("decision") && n.fm.get("status").map(String::as_str).unwrap_or("active") == "active").map(|n| format!("- {}: {} ({})", n.key(), n.fm.get("title").cloned().unwrap_or_default(), n.rel)).take(25).collect();
-    if !act.is_empty() {
-        out.push_str(&format!("## Active decisions (check with `smug check <id>` before acting)\n{}\n", act.join("\n")));
+    // Order is priority: the budget cuts the tail, so rules, identity, the newest card and open threads arrive first.
+    let parts = [
+        ("Rules", read(&["Rules", "Kurallar"])),
+        ("Core", read(&["Core"])),
+        ("Last-Session", Some(last[..end].to_string())),
+        ("Threads", read(&["Threads"])),
+        ("Active decisions (check with `smug check <id>` before acting)", Some(act.join("\n"))),
+        ("Earlier sessions", Some(last[end..].to_string())),
+    ];
+    let mut out = String::new();
+    for (h, t) in parts {
+        if let Some(t) = t.filter(|t| !t.trim().is_empty()) {
+            out.push_str(&format!("## {h}\n{t}\n"));
+        }
     }
     let cut = out.char_indices().nth(9500).map(|(i, _)| i).unwrap_or(out.len());
     print!("{}", &out[..cut]);

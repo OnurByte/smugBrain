@@ -269,14 +269,15 @@ pub fn agent(root: &Path, a: &[String]) -> R {
         "doctor" => {
             // Starts the server exactly as a tool would (same command, same --vault) but from a DIFFERENT directory and
             // without SMUG_VAULT: if the vault path were not passed explicitly, this is where it would break.
+            // Writes are best-effort: a server that refuses the directory exits before reading, and that is a FAIL, not an I/O error.
             use std::io::{BufRead, BufReader, Write};
             let (cmd, args) = launch(root);
             let want = args[2].clone();
             let mut ch = std::process::Command::new(cmd).args(args).current_dir(std::env::temp_dir()).env_remove("SMUG_VAULT").stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn()?;
             let mut stdin = ch.stdin.take().unwrap();
-            writeln!(stdin, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"doctor","version":"0"}}}}}}"#)?;
-            writeln!(stdin, r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}"#)?;
-            writeln!(stdin, r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"smug_recall","arguments":{{"query":"doctor"}}}}}}"#)?;
+            let _ = writeln!(stdin, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"doctor","version":"0"}}}}}}"#);
+            let _ = writeln!(stdin, r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}"#);
+            let _ = writeln!(stdin, r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"smug_recall","arguments":{{"query":"doctor"}}}}}}"#);
             drop(stdin);
             let (mut tools, mut vault_seen, mut recall_ok) = (0, String::new(), false);
             for l in BufReader::new(ch.stdout.take().unwrap()).lines().map_while(Result::ok) {
