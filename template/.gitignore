@@ -1,0 +1,9 @@
+# Secrets never leave the machine
+.secrets/*
+!.secrets/README.md
+.env
+*.env
+*.key
+*.pem
+.obsidian/workspace*
+.obsidian/cache/
