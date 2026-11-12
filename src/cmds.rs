@@ -1,4 +1,5 @@
 use crate::{index, mem, store::State, util::*, write::write_note};
+use serde_json::{json, Value};
 use std::{fs, io::Read, path::{Path, PathBuf}, process::Command, time::Instant};
 
 const TEMPLATE: &[(&str, &str)] = &[
@@ -193,14 +194,28 @@ pub fn setup(root: &Path, a: &[String]) -> R {
     match a.first().map(String::as_str) {
         Some("claude") => {
             let p = root.join(".claude/settings.json");
-            let json = r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"smug context"}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"smug hook prompt"}]}],"Stop":[{"hooks":[{"type":"command","command":"smug hook stop"}]}]}}"#;
-            if p.exists() {
-                println!("{} exists. Merge this by hand:\n{json}", p.display());
-            } else {
-                fs::create_dir_all(p.parent().unwrap())?;
-                fs::write(&p, json)?;
-                println!("wrote {}: sessions start with your memory, every prompt gets note candidates and failure warnings, and notes your agent actually used are credited when it stops.", p.display());
+            let mut cfg: Value = match fs::read_to_string(&p) {
+                Ok(t) if !t.trim().is_empty() => serde_json::from_str(&t).map_err(|e| format!("{} is not valid JSON ({e}); left untouched", p.display()))?,
+                _ => json!({}),
+            };
+            let hooks = cfg.as_object_mut().ok_or("settings.json is not an object")?.entry("hooks").or_insert_with(|| json!({}));
+            let hooks = hooks.as_object_mut().ok_or("hooks is not an object")?;
+            let mut added = vec![];
+            for (event, cmd, matcher) in [("SessionStart", "smug context", None), ("UserPromptSubmit", "smug hook prompt", None), ("PreToolUse", "smug hook pre-edit", Some("Edit|Write|MultiEdit")), ("Stop", "smug hook stop", None), ("SessionEnd", "smug hook session-end", None), ("PreCompact", "smug hook pre-compact", None)] {
+                let arr = hooks.entry(event).or_insert_with(|| json!([])).as_array_mut().ok_or("a hook event is not an array")?;
+                if arr.iter().any(|e| e.to_string().contains(cmd)) {
+                    continue; // already there: never duplicate, never touch the user's own hooks
+                }
+                let mut entry = json!({"hooks": [{"type": "command", "command": cmd}]});
+                if let Some(m) = matcher {
+                    entry["matcher"] = json!(m);
+                }
+                arr.push(entry);
+                added.push(event);
             }
+            fs::create_dir_all(p.parent().unwrap())?;
+            fs::write(&p, serde_json::to_string_pretty(&cfg)? + "\n")?;
+            println!("{}: {} (your other settings and hooks were kept)", p.display(), if added.is_empty() { "already set up".to_string() } else { format!("added {}", added.join(", ")) });
             Ok(0)
         }
         Some("codex") => {
@@ -218,72 +233,5 @@ pub fn setup(root: &Path, a: &[String]) -> R {
             Ok(0)
         }
         _ => Err("usage: smug setup claude|codex|hermes".into()),
-    }
-}
-
-fn flatten(v: &serde_json::Value, out: &mut String) {
-    match v {
-        serde_json::Value::String(s) => {
-            out.push_str(s);
-            out.push('\n');
-        }
-        serde_json::Value::Array(a) => a.iter().for_each(|x| flatten(x, out)),
-        serde_json::Value::Object(o) => o.values().for_each(|x| flatten(x, out)),
-        _ => {}
-    }
-}
-
-/// `smug hook prompt` (Claude Code UserPromptSubmit) and `smug hook stop` (Stop). Silent unless useful. Never fails.
-/// `prompt` remembers which notes it surfaced; `stop` reads the transcript and credits the ones the assistant actually used.
-pub fn hook(root: &Path, a: &[String]) -> R {
-    let mut s = String::new();
-    let _ = std::io::stdin().read_to_string(&mut s);
-    let input: serde_json::Value = serde_json::from_str(&s).unwrap_or_default();
-    match a.first().map(String::as_str) {
-        Some("prompt") => {
-            let prompt = input["prompt"].as_str().unwrap_or("").to_string();
-            if prompt.trim().is_empty() {
-                return Ok(0);
-            }
-            for w in mem::warn_texts(&mem::load_notes(root), &prompt) {
-                println!("{w}");
-            }
-            if let Ok(st) = State::open(root) {
-                if let Ok(h) = mem::search_valid(root, &st, &prompt, 3, false) {
-                    let _ = fs::write(root.join(".smug/surfaced"), h.iter().map(|x| x.path.as_str()).collect::<Vec<_>>().join("\n"));
-                    if !h.is_empty() {
-                        println!("smug: note candidates (open before relying on them):");
-                        h.iter().for_each(|x| println!("- {}", x.path));
-                    }
-                }
-            }
-            Ok(0)
-        }
-        Some("stop") => {
-            let surfaced = fs::read_to_string(root.join(".smug/surfaced")).unwrap_or_default();
-            let Some(tp) = input["transcript_path"].as_str() else { return Ok(0) };
-            let Ok(tr) = fs::read_to_string(tp) else { return Ok(0) };
-            // only what the assistant wrote or did; the hook's own injected candidate list is not evidence
-            let mut said = String::new();
-            for l in tr.lines().rev().take(400) {
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(l) {
-                    if v["type"] == "assistant" || v["message"]["role"] == "assistant" {
-                        flatten(&v["message"], &mut said);
-                    }
-                }
-            }
-            if let Ok(st) = State::open(root) {
-                for p in surfaced.lines().filter(|p| !p.is_empty()) {
-                    let base = Path::new(p).file_name().map(|b| b.to_string_lossy().to_string()).unwrap_or_default();
-                    if !base.is_empty() && said.contains(&base) {
-                        let _ = st.append("feedback", p, "used", None);
-                        let _ = st.add_feedback(p, 1);
-                    }
-                }
-            }
-            let _ = fs::remove_file(root.join(".smug/surfaced"));
-            Ok(0)
-        }
-        _ => Err("usage: smug hook prompt|stop".into()),
     }
 }

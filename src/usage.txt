@@ -15,10 +15,22 @@ memory
   at <date> [words]                  what was valid and known on that date
   impact <id>                        what depends on this decision
   patch <old> --new-id <id> --source <s>   propose a change, show what it touches
-  eval [patch]                       run evals/cases.jsonl, before/after a patch
+  eval [patch] [--model c] [--ab]    run evals/cases.jsonl, before/after a patch; --ab = memory on vs off
   apply <patch> [--force]            apply a patch if evals do not regress
   feedback <note> used|useful|harmful   outcome memory (nudges ranking)
   bench                              recall@k, MRR, latency on evals/cases.jsonl
+
+agents
+  agent list|install|uninstall|doctor   connect Claude Code, Codex, Cursor, Gemini, ... (MCP; --dry-run, --global)
+  mcp [--read-only]                  MCP server over stdio: recall, check, explain, impact, propose, feedback
+  hook prompt|pre-edit|stop|session-end|pre-compact   lifecycle hooks, per-session state
+  receipts                           what each session was shown, used and captured
+
+learning (nothing becomes memory without a human)
+  capture [--transcript f]           save a session, secret lines redacted
+  learn <capture> --model <cmd> --propose   candidates from a capture
+  propose <id> --kind ...            candidate memory   review   list them
+  promote <id> | reject <id>         the human step (promote needs a source, refuses conflicts)
 
 safety
   scan      secret guard        backup   scan staged files, commit, push

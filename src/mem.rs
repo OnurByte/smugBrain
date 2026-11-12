@@ -1,5 +1,5 @@
 //! Memory model: decisions with sources and validity, failures, impact, patches, behavioural eval, guard, time machine.
-use crate::{index, store::State, util::*, write::write_note};
+use crate::{index, model, store::State, util::*, write::write_note};
 use serde_json::{json, Value};
 use std::{collections::HashSet, fs, io::Read, path::Path, time::Instant};
 
@@ -37,24 +37,24 @@ pub fn opt(a: &[String], flag: &str) -> Option<String> {
     a.iter().position(|x| x == flag).and_then(|i| a.get(i + 1)).cloned()
 }
 
-fn stdin_text() -> String {
+pub fn stdin_text() -> String {
     let mut s = String::new();
     let _ = std::io::stdin().read_to_string(&mut s);
     s
 }
 
-fn one_line(s: &str) -> String {
+pub fn one_line(s: &str) -> String {
     s.replace(['\n', '\r'], " ")
 }
 
-fn valid_id(id: &str) -> Res<()> {
+pub fn valid_id(id: &str) -> Res<()> {
     if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
         return Err(format!("bad id '{id}': use letters, digits, - and _").into());
     }
     Ok(())
 }
 
-fn fm_note(ty: &str, id: &str, extra: &[(&str, String)], body: &str) -> String {
+pub fn fm_note(ty: &str, id: &str, extra: &[(&str, String)], body: &str) -> String {
     let mut s = format!("---\ntype: {ty}\nid: {id}\n");
     for (k, v) in extra {
         s += &format!("{k}: {}\n", one_line(v));
@@ -63,7 +63,7 @@ fn fm_note(ty: &str, id: &str, extra: &[(&str, String)], body: &str) -> String {
     s
 }
 
-fn created(st: &State, rel: &str, text: &str) -> R {
+pub fn created(st: &State, rel: &str, text: &str) -> R {
     match write_note(st, Path::new(rel), text.as_bytes(), Some("new"))? {
         Ok(h) => {
             println!("{rel}\n{h}");
@@ -90,14 +90,31 @@ pub fn decide(root: &Path, a: &[String]) -> R {
         ("valid_from", d.clone()),
         ("known_at", opt(a, "--known-at").unwrap_or_else(today)),
         ("depends_on", format!("[{}]", opt(a, "--depends").unwrap_or_default())),
+        ("files", opt(a, "--files").map(|f| format!("[{f}]")).unwrap_or_default()),
     ];
     let st = State::open(root)?;
     created(&st, &format!("500-knowledge/decisions/{id}.md"), &fm_note("decision", id, &extra, &stdin_text()))
 }
 
 pub fn fail(root: &Path, a: &[String]) -> R {
-    let id = a.first().ok_or("usage: smug fail <id> --method <m> --reason <r> [--version v] [--project p] [--source s]")?;
+    let id = a.first().ok_or("usage: smug fail <id> --method <m> --reason <r> [--version v] [--project p] [--source s] [--files a,b] [--file f] [--commit sha|head] [--test-result t] [--verified yes|no]")?;
     valid_id(id)?;
+    let git_head = || std::process::Command::new("git").args(["rev-parse", "--short", "HEAD"]).output().ok().filter(|o| o.status.success()).map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
+    let commit = match opt(a, "--commit").as_deref() {
+        Some("head") => git_head(),
+        Some(c) => c.to_string(),
+        None => String::new(),
+    };
+    let file = opt(a, "--file").unwrap_or_default();
+    let file_sha = if file.is_empty() { String::new() } else { fs::read(&file).map(|d| sha(&d)).unwrap_or_default() };
+    let mut files = opt(a, "--files").unwrap_or_default();
+    if !file.is_empty() && !files.split(',').any(|f| f == file) {
+        files = if files.is_empty() { file.clone() } else { format!("{files},{file}") };
+    }
+    let verified = opt(a, "--verified").unwrap_or_else(|| "no".into());
+    if !matches!(verified.as_str(), "yes" | "no") {
+        return Err("--verified must be yes or no".into());
+    }
     let extra = [
         ("title", opt(a, "--method").ok_or("--method required")?),
         ("method", opt(a, "--method").unwrap_or_default()),
@@ -105,6 +122,11 @@ pub fn fail(root: &Path, a: &[String]) -> R {
         ("version", opt(a, "--version").unwrap_or_default()),
         ("project", opt(a, "--project").unwrap_or_default()),
         ("source", opt(a, "--source").unwrap_or_default()),
+        ("files", if files.is_empty() { String::new() } else { format!("[{files}]") }),
+        ("commit", commit),
+        ("file_sha", file_sha),
+        ("test_result", opt(a, "--test-result").unwrap_or_default()),
+        ("verified", verified),
         ("status", "active".into()),
         ("valid_from", today()),
         ("known_at", today()),
@@ -115,7 +137,10 @@ pub fn fail(root: &Path, a: &[String]) -> R {
 
 // ---------- guard ----------
 pub fn check_status(notes: &[Note], id: &str) -> (&'static str, String) {
-    let Some(n) = notes.iter().find(|n| n.get("id") == id) else { return ("UNKNOWN", "no note with that id".into()) };
+    let Some(n) = notes.iter().find(|n| n.get("id") == id && n.get("type") != "candidate").or_else(|| notes.iter().find(|n| n.get("id") == id)) else { return ("UNKNOWN", "no note with that id".into()) };
+    if n.get("type") == "candidate" {
+        return ("CANDIDATE", "proposed, not promoted: do not rely on it".into());
+    }
     if n.status() == "superseded" {
         return ("STALE", format!("superseded by {} on {}", n.get("superseded_by"), n.get("valid_to")));
     }
@@ -125,10 +150,12 @@ pub fn check_status(notes: &[Note], id: &str) -> (&'static str, String) {
             return ("CONFLICTED", format!("{} is also active for topic '{topic}'", o.get("id")));
         }
     }
-    if n.get("source").is_empty() {
+    // a decision needs a source; a failure is also evidenced by the commit or test result it was recorded with
+    let evidence = !n.get("source").is_empty() || (n.get("type") == "failure" && (!n.get("commit").is_empty() || !n.get("test_result").is_empty()));
+    if !evidence {
         return ("UNSUPPORTED", "no source".into());
     }
-    ("CURRENT", format!("source: {}", n.get("source")))
+    ("CURRENT", if n.get("source").is_empty() { format!("evidence: commit {} {}", n.get("commit"), n.get("test_result")).trim().to_string() } else { format!("source: {}", n.get("source")) })
 }
 
 pub fn check(root: &Path, a: &[String]) -> R {
@@ -148,7 +175,7 @@ pub fn warn_texts(notes: &[Note], text: &str) -> Vec<String> {
             let m = toks(n.get("method"));
             let need = m.len().clamp(1, 2);
             (m.intersection(&t).count() >= need).then(|| {
-                format!("WARN {}: '{}' failed before because {} (version {}, source {})", n.get("id"), n.get("method"), n.get("reason"), n.get("version"), n.get("source"))
+                format!("WARN {}: '{}' failed before because {} (version {}, source {}, verified {}{})", n.get("id"), n.get("method"), n.get("reason"), n.get("version"), n.get("source"), if n.get("verified").is_empty() { "no" } else { n.get("verified") }, if n.get("commit").is_empty() { String::new() } else { format!(", commit {}", n.get("commit")) })
             })
         })
         .collect()
@@ -219,7 +246,8 @@ pub fn at(root: &Path, a: &[String]) -> R {
 
 // ---------- retrieval with validity filter ----------
 fn is_superseded(root: &Path, r: &str) -> bool {
-    fs::read_to_string(root.join(r)).map(|t| split_fm(&t).0.get("status").map(String::as_str) == Some("superseded")).unwrap_or(false)
+    // superseded decisions and unreviewed candidates are never current memory
+    fs::read_to_string(root.join(r)).map(|t| { let f = split_fm(&t).0; f.get("status").map(String::as_str) == Some("superseded") || f.get("type").map(String::as_str) == Some("candidate") }).unwrap_or(false)
 }
 
 /// Retrieval, then a hard filter: superseded notes never come back (unless `history`), feedback nudges the order.
@@ -366,21 +394,6 @@ fn strs(v: &Value) -> Vec<String> {
     v.as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
 }
 
-/// Runs `cmd` through the shell with `prompt` on stdin and returns its stdout. This is how a real model joins the eval:
-/// any command that reads a prompt and prints an answer (for example `claude -p`).
-fn ask_model(cmd: &str, prompt: &str) -> Res<String> {
-    use std::{io::Write, process::{Command, Stdio}};
-    let mut c = if cfg!(windows) { Command::new("cmd") } else { Command::new("sh") };
-    c.args([if cfg!(windows) { "/C" } else { "-c" }, cmd]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit());
-    let mut ch = c.spawn()?;
-    let _ = ch.stdin.take().unwrap().write_all(prompt.as_bytes());
-    let o = ch.wait_with_output()?;
-    if !o.status.success() {
-        return Err(format!("model command failed with {}", o.status).into());
-    }
-    Ok(String::from_utf8_lossy(&o.stdout).to_string())
-}
-
 fn run_cases(root: &Path, st: &State, cs: &[Value], model: Option<&str>) -> Res<Vec<(bool, String)>> {
     cs.iter()
         .map(|c| {
@@ -394,7 +407,7 @@ fn run_cases(root: &Path, st: &State, cs: &[Value], model: Option<&str>) -> Res<
             if let (Some(m), false) = (model, want.is_empty() && forbid.is_empty()) {
                 let ctx: Vec<String> = got.iter().map(|p| format!("### {p}\n{}", fs::read_to_string(root.join(p)).unwrap_or_default().chars().take(3000).collect::<String>())).collect();
                 let prompt = format!("Answer using only the notes below. If they do not contain the answer, say so.\n\n{}\n\nQuestion: {q}\n", ctx.join("\n\n"));
-                let ans = ask_model(m, &prompt)?.to_lowercase();
+                let ans = model::ask(m, &prompt)?.to_lowercase();
                 let miss: Vec<&String> = want.iter().filter(|w| !ans.contains(&w.to_lowercase())).collect();
                 let bad: Vec<&String> = forbid.iter().filter(|w| ans.contains(&w.to_lowercase())).collect();
                 if !miss.is_empty() || !bad.is_empty() {
@@ -415,9 +428,45 @@ fn copy_md(src: &Path, dst: &Path) -> Res<()> {
     Ok(())
 }
 
+/// Memory on vs off: the same model, the same questions, with and without the retrieved notes in the prompt.
+fn ab(root: &Path, cs: &[Value], model_cmd: &str) -> R {
+    let st = State::open(root)?;
+    let (mut on, mut off, mut n) = (0, 0, 0);
+    for c in cs {
+        let (want, forbid) = (strs(&c["answer_contains"]), strs(&c["answer_absent"]));
+        if want.is_empty() && forbid.is_empty() {
+            continue;
+        }
+        n += 1;
+        let q = c["q"].as_str().unwrap_or("");
+        let k = c["k"].as_u64().unwrap_or(5) as usize;
+        let ctx: Vec<String> = search_valid(root, &st, q, k, false)?.iter().map(|h| format!("### {}\n{}", h.path, fs::read_to_string(root.join(&h.path)).unwrap_or_default().chars().take(3000).collect::<String>())).collect();
+        let judge = |ans: String| {
+            let a = ans.to_lowercase();
+            want.iter().all(|w| a.contains(&w.to_lowercase())) && !forbid.iter().any(|w| a.contains(&w.to_lowercase()))
+        };
+        let with = judge(model::ask(model_cmd, &format!("Answer using only the notes below. If they do not contain the answer, say so.\n\n{}\n\nQuestion: {q}\n", ctx.join("\n\n")))?);
+        let without = judge(model::ask(model_cmd, &format!("Answer the question. If you do not know, say so.\n\nQuestion: {q}\n"))?);
+        on += with as usize;
+        off += without as usize;
+        println!("memory on {:<4} off {:<4} {q}", if with { "pass" } else { "fail" }, if without { "pass" } else { "fail" });
+    }
+    if n == 0 {
+        return Err("no case has answer_contains or answer_absent: nothing to compare".into());
+    }
+    println!("memory on: {on}/{n}   memory off: {off}/{n}   lift: {:+}", on as i64 - off as i64);
+    Ok(if on < off { 1 } else { 0 })
+}
+
 pub fn eval(root: &Path, a: &[String]) -> R {
     let cs = cases(root)?;
     let model = opt(a, "--model");
+    if let Some(t) = opt(a, "--timeout") {
+        std::env::set_var("SMUG_MODEL_TIMEOUT", t);
+    }
+    if a.iter().any(|x| x == "--ab") {
+        return ab(root, &cs, model.as_deref().ok_or("--ab needs --model <command>")?);
+    }
     if model.is_some() && !cs.iter().any(|c| c.get("answer_contains").is_some() || c.get("answer_absent").is_some()) {
         eprintln!("smug: --model given but no case has answer_contains or answer_absent; only retrieval is checked");
     }
@@ -456,7 +505,7 @@ pub fn eval(root: &Path, a: &[String]) -> R {
 }
 
 pub fn apply(root: &Path, a: &[String]) -> R {
-    let n = a.first().ok_or("usage: smug apply <patch-number> [--force] [--model <cmd>]")?;
+    let n = a.first().ok_or("usage: smug apply <patch-number> [--force] [--model <cmd>] [--timeout s]")?;
     let force = a.iter().any(|x| x == "--force");
     let rel = patch_rel(n)?;
     let text = fs::read_to_string(root.join(&rel)).map_err(|_| "no such patch")?;

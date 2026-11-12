@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.0 (2026-11-12)
+
+The agent layer. smug now meets agents where they work.
+
+- **MCP server** (`smug mcp [--read-only]`): six tools (`smug_recall`, `smug_check`, `smug_explain`, `smug_impact`, `smug_propose`, `smug_feedback`). Writes are limited to inert candidates; promotion is human-only and not exposed.
+- **Agent installer** (`smug agent list|install|uninstall|doctor`): Claude Code, Codex CLI, Cursor, Gemini CLI, Windsurf, Kiro, VS Code, OpenCode, plus snippets for Zed and Cline. Safe config merge, `--dry-run`, `--force`, refuses symlinks and unparsable files, uninstall. Claude Code also gets hooks (merged, never overwritten) and a versioned skill.
+- **Edit-time memory**: `smug hook pre-edit` reminds the agent of decisions and failed attempts recorded for a file before it edits it.
+- **Evidence on failures**: `smug fail` records commit, file hash, test result and verification state.
+- **Session isolation**: hook state lives under `.smug/sessions/<hash>/`; two agents on one vault no longer overwrite each other. `smug receipts`.
+- **Learning loop**: `capture`, `learn --propose`, `review`, `promote`, `reject`; `SessionEnd` and `PreCompact` capture sessions with secret-shaped lines redacted. Nothing becomes memory without a human.
+- **Model eval, isolated**: the model command runs in a throwaway directory with a timeout and an output cap. `smug eval --ab` measures the same model with memory on and off.
+- 363 automated tests (a few Unix-only ones are skipped on Windows).
+
+## 1.0.1 (not released separately)
+
+Folded into 1.1.0: crash-safe `apply`, empty or malformed eval is an error, self-healing search index, model-in-the-loop eval, Stop-hook feedback.
+
 ## 1.0.1 (2026-11-12)
 
 Consistency fixes found in an external review of 1.0.0.

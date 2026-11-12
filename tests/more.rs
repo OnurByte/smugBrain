@@ -469,12 +469,13 @@ t!(setup_claude_writes_both_hooks, {
     let j: serde_json::Value = serde_json::from_str(&fs::read_to_string(v.join(".claude/settings.json")).unwrap()).unwrap();
     assert!(j["hooks"]["SessionStart"].is_array() && j["hooks"]["UserPromptSubmit"].is_array() && j["hooks"]["Stop"].is_array());
 });
-t!(setup_claude_never_overwrites, {
+t!(setup_claude_keeps_the_users_settings, {
     let v = vault("scow");
     fs::create_dir_all(v.join(".claude")).unwrap();
     fs::write(v.join(".claude/settings.json"), "{\"mine\":true}").unwrap();
     smug(&v, &["setup", "claude"], "");
-    assert_eq!(fs::read_to_string(v.join(".claude/settings.json")).unwrap(), "{\"mine\":true}");
+    let j: serde_json::Value = serde_json::from_str(&fs::read_to_string(v.join(".claude/settings.json")).unwrap()).unwrap();
+    assert!(j["mine"] == true && j["hooks"]["Stop"].is_array());
 });
 t!(setup_codex_is_idempotent, {
     let v = vault("scx");

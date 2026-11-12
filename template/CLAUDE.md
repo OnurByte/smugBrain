@@ -28,3 +28,5 @@ You are the user's thinking partner and memory. Be direct and short; no corporat
 - Changing a decision: `smug patch <old> --new-id <id> --source <s>`, read what it touches (`smug impact`), `smug eval <n>`, then `smug apply <n>`. Never edit the old decision by hand.
 - Something failed? `smug fail <id> --method <m> --reason <r>`. Before retrying a method: `smug warn <text>`.
 - Add questions the memory must keep answering right to `evals/cases.jsonl`.
+- Learned something durable? `smug propose <id> --kind decision|failure ...` (or the `smug_propose` MCP tool). A proposal is inert; only the human turns it into memory (`smug review`, `smug promote`). Never promote your own proposals.
+- MCP tools, if connected: `smug_recall` before a non-trivial change, `smug_check` before relying on a remembered decision, `smug_impact` before proposing to change one.

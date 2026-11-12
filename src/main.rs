@@ -1,7 +1,13 @@
 //! smug: plain-Markdown memory for agents. Markdown is truth; .smug/ is disposable state.
+mod agent;
 mod cmds;
+mod hooks;
 mod index;
+mod learn;
+mod mcp;
 mod mem;
+mod model;
+mod session;
 mod store;
 mod util;
 mod write;
@@ -32,7 +38,16 @@ fn main() {
         Some("context") => cmds::context(&root),
         Some("doctor") => cmds::doctor(&root),
         Some("setup") => cmds::setup(&root, rest),
-        Some("hook") => cmds::hook(&root, rest),
+        Some("hook") => hooks::hook(&root, rest),
+        Some("mcp") => mcp::serve(&root, rest),
+        Some("agent") => agent::agent(&root, rest),
+        Some("propose") => learn::propose(&root, rest),
+        Some("review") => learn::review(&root),
+        Some("promote") => learn::promote(&root, rest),
+        Some("reject") => learn::reject(&root, rest),
+        Some("capture") => learn::capture(&root, rest),
+        Some("learn") => learn::learn(&root, rest),
+        Some("receipts") => hooks::receipts(&root),
         Some("decide") => mem::decide(&root, rest),
         Some("fail") => mem::fail(&root, rest),
         Some("check") => mem::check(&root, rest),

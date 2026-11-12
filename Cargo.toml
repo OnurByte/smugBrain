@@ -1,6 +1,6 @@
 [package]
 name = "smug"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2021"
 description = "Local-first memory for AI coding agents: Markdown notes, decisions with sources, stale-decision guard, change-impact preview and eval gate. One binary."
 repository = "https://github.com/OnurByte/smugbrain"
@@ -17,6 +17,7 @@ redb = "4.5.0"
 tantivy = { version = "0.27.0", default-features = false, features = ["mmap", "lz4-compression"] }
 serde_json = "1.0.154"
 serde = { version = "1.0.229", features = ["derive"] }
+toml_edit = "0.25.19"
 
 [profile.release]
 opt-level = 3
