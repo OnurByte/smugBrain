@@ -1,0 +1,17 @@
+name: haiku-diagnose
+on: workflow_dispatch
+jobs:
+  haiku:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cross-platform-actions/action@v1.7.0
+        with:
+          operating_system: haiku
+          version: 'r1beta6'
+          run: |
+            pkgman install -y rust_bin git
+            cargo build --release
+            export SMUG_VAULT=/tmp/hv
+            ./target/release/smug init /tmp/hv
+            echo hi | ./target/release/smug write a.md --expect new; echo "exit=$?"
