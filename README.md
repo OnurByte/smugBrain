@@ -1,7 +1,7 @@
 <p align="center"><img src="assets/banner.svg" alt="smugBrain" width="880"></p>
 <p align="center"><a href="README.tr.md">Türkçe</a> · <a href="LICENSE">Public domain</a></p>
 
-**smugBrain** is a second brain that is, frankly, better than yours. Plain Markdown notes, a Rust core (in progress), and agents (Claude Code, Codex, Hermes) that remember what you did yesterday. No account. No cloud.
+**smugBrain** is a brain upgrade that is, frankly, better than yours. Plain Markdown notes, a Rust core (in progress), and agents (Claude Code, Codex, Hermes) that remember what you did yesterday. No account. No cloud.
 
 <p align="center"><img src="assets/card-what.svg" alt="What is it" width="880"></p>
 

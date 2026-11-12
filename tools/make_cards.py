@@ -166,7 +166,7 @@ body += t(116, 454, "Or run the Linux line inside WSL or Git Bash.", 12, 300, GR
 save("card-install.svg", page(500, "Install", "1.7", body))
 
 # ---------- 1.8 compare ----------
-cols = ["smugBrain", "avenoxbeyin", "obsidian-second-brain", "Graphiti", "mem0"]
+cols = ["smugBrain", "avenoxbeyin", "obsidian-2nd", "Graphiti", "mem0"]
 rows = [("Notes are plain Markdown files", ["Yes", "Yes", "Yes", "No: graph DB", "No: vector DB"]),
         ("License", ["Public domain", "MIT", "MIT", "Apache-2.0", "Apache-2.0"]),
         ("Needs a database or account", ["No", "No", "No", "Graph DB", "Sign-up or DB"]),
@@ -178,7 +178,7 @@ for j, c in enumerate(cols):
     x = x0 + j * cw
     if j == 0:
         body += f'<rect x="{x-4}" y="100" width="{cw}" height="{70+len(rows)*54}" fill="{RED}"/>'
-    body += t(x + cw / 2 - 8, 148, c if len(c) < 12 else "obsidian-2nd", 11.5, 700, PAPER if j == 0 else INK, "middle")
+    body += t(x + cw / 2 - 8, 148, c if len(c) < 12 else c, 11.5, 700, PAPER if j == 0 else INK, "middle")
 for i, (lab, vals) in enumerate(rows):
     y = 186 + i * 54
     body += f'<line x1="100" y1="{y-18}" x2="{W-36}" y2="{y-18}" stroke="#DDD"/>' + t(100, y + 8, lab, 13, 700)

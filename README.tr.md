@@ -1,7 +1,7 @@
 <p align="center"><img src="assets/banner.svg" alt="smugBrain" width="880"></p>
 <p align="center"><a href="README.md">English</a> · <a href="LICENSE">Kamu malı</a></p>
 
-**smugBrain**, açıkçası seninkinden daha iyi bir ikinci beyin. Düz Markdown notlar, Rust çekirdek (yapım aşamasında) ve dünü hatırlayan ajanlar (Claude Code, Codex, Hermes). Hesap yok. Bulut yok.
+**smugBrain**, açıkçası seninkinden daha iyi bir beyin yükseltmesi. Düz Markdown notlar, Rust çekirdek (yapım aşamasında) ve dünü hatırlayan ajanlar (Claude Code, Codex, Hermes). Hesap yok. Bulut yok.
 
 <p align="center"><img src="assets/card-what.svg" alt="Nedir" width="880"></p>
 
