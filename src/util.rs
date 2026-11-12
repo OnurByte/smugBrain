@@ -229,21 +229,130 @@ pub fn set_fm(text: &str, key: &str, val: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn paths() {
-        assert!(safe_rel("a/b.md").is_ok());
-        for p in ["../x", "/etc/passwd", ".secrets/a.md", "a/../../b", ".git/config", ""] {
-            assert!(safe_rel(p).is_err(), "{p}");
-        }
+    macro_rules! t {
+        ($n:ident, $b:expr) => {
+            #[test]
+            fn $n() {
+                $b
+            }
+        };
     }
-    #[test]
-    fn secrets() {
-        let p = patterns();
-        assert!(hits(&p, b"-----BEGIN OPENSSH PRIVATE KEY-----").contains(&"private-key"));
-        assert!(hits(&p, b"password: hunter2hunter2").contains(&"credential-assignment"));
-        assert!(hits(&p, b"one two three four five six seven eight nine ten eleven twelve").contains(&"recovery-phrase"));
-        assert!(hits(&p, b"just a normal note about passwords").is_empty());
+    fn found(cat: &str, text: &str) -> bool {
+        hits(&patterns(), text.as_bytes()).contains(&cat)
     }
+    fn clean(text: &str) -> bool {
+        hits(&patterns(), text.as_bytes()).is_empty()
+    }
+
+    // --- secret guard: things that must be caught
+    t!(secret_rsa_key, assert!(found("private-key", "-----BEGIN RSA PRIVATE KEY-----")));
+    t!(secret_ec_key, assert!(found("private-key", "-----BEGIN EC PRIVATE KEY-----")));
+    t!(secret_dsa_key, assert!(found("private-key", "-----BEGIN DSA PRIVATE KEY-----")));
+    t!(secret_pgp_key, assert!(found("private-key", "-----BEGIN PGP PRIVATE KEY-----")));
+    t!(secret_openssh_key, assert!(found("private-key", "x\n-----BEGIN OPENSSH PRIVATE KEY-----\ny")));
+    t!(secret_ghp, assert!(found("github-token", "ghp_abcdefghijklmnopqrstuvwxyz0123456789")));
+    t!(secret_github_pat, assert!(found("github-token", "use github_pat_11ABCDEFG0123456789abcdef here")));
+    t!(secret_sk, assert!(found("api-key", "key sk-abcdefghijklmnopqrstuvwx")));
+    t!(secret_slack, assert!(found("api-key", "xoxb-123456789012-abcdefghijkl")));
+    t!(secret_api_key_colon, assert!(found("credential-assignment", "api_key: abcdefgh12345")));
+    t!(secret_api_dash_key, assert!(found("credential-assignment", "API-KEY=abcdefgh12345")));
+    t!(secret_secret_eq, assert!(found("credential-assignment", "SECRET=abcdefghij1")));
+    t!(secret_password, assert!(found("credential-assignment", "password: hunter2hunter2")));
+    t!(secret_passwd, assert!(found("credential-assignment", "passwd: abcdefgh")));
+    t!(secret_token_spaces, assert!(found("credential-assignment", "  token = abcdefgh1234  ")));
+    t!(secret_phrase_12, assert!(found("recovery-phrase", "one two three four five six seven eight nine ten eleven twelve")));
+    t!(secret_phrase_24, assert!(found("recovery-phrase", &["word"; 24].join(" "))));
+    t!(secret_phrase_tabs, assert!(found("recovery-phrase", &["abc"; 15].join("\t"))));
+    t!(secret_in_middle_of_note, assert!(found("credential-assignment", "# Notes\nhello\npassword: hunter2hunter2\nbye")));
+
+    // --- secret guard: things that must pass
+    t!(clean_plain_note, assert!(clean("just a normal note about passwords")));
+    t!(clean_env_placeholder, assert!(clean("password: ${PASSWORD}")));
+    t!(clean_angle_placeholder, assert!(clean("password: <your-password>")));
+    t!(clean_short_token, assert!(clean("token: short")));
+    t!(clean_prose_about_keys, assert!(clean("the api key is stored in the vault elsewhere")));
+    t!(clean_short_ghp, assert!(clean("ghp_short")));
+    t!(clean_short_sk, assert!(clean("sk-short")));
+    t!(clean_public_key, assert!(clean("-----BEGIN PUBLIC KEY-----")));
+    t!(clean_eleven_words, assert!(clean(&["word"; 11].join(" "))));
+    t!(clean_twentyfive_words, assert!(clean(&["word"; 25].join(" "))));
+    t!(clean_capitalised_sentence, assert!(clean("One two three four five six seven eight nine ten eleven twelve")));
+    t!(clean_punctuated_sentence, assert!(clean("one, two, three, four, five, six, seven, eight, nine, ten, eleven, twelve")));
+    t!(clean_binary_with_nul, assert!(hits(&patterns(), b"\0password: hunter2hunter2").is_empty()));
+    t!(clean_empty, assert!(clean("")));
+    t!(clean_markdown_heading, assert!(clean("# Secrets handling\n\nWe never store them.")));
+
+    // --- path safety
+    t!(path_ok_simple, assert!(safe_rel("a.md").is_ok()));
+    t!(path_ok_nested, assert!(safe_rel("a/b/c.md").is_ok()));
+    t!(path_ok_vault_dir, assert!(safe_rel("500-knowledge/x.md").is_ok()));
+    t!(path_ok_space, assert!(safe_rel("with space.md").is_ok()));
+    t!(path_ok_dots, assert!(safe_rel("dots.in.name.md").is_ok()));
+    t!(path_ok_unicode, assert!(safe_rel("ışık/şemsiye.md").is_ok()));
+    t!(path_ok_leading_dash, assert!(safe_rel("-dash.md").is_ok()));
+    t!(path_ok_curdir, assert!(safe_rel("./a.md").is_ok()));
+    t!(path_bad_parent, assert!(safe_rel("../x").is_err()));
+    t!(path_bad_deep_parent, assert!(safe_rel("a/../../x").is_err()));
+    t!(path_bad_only_parents, assert!(safe_rel("../../..").is_err()));
+    t!(path_bad_absolute, assert!(safe_rel("/etc/passwd").is_err()));
+    t!(path_bad_empty, assert!(safe_rel("").is_err()));
+    t!(path_bad_secrets_dir, assert!(safe_rel(".secrets/a.md").is_err()));
+    t!(path_bad_nested_secrets, assert!(safe_rel("a/.secrets/x").is_err()));
+    t!(path_bad_smug_dir, assert!(safe_rel(".smug/state.redb").is_err()));
+    t!(path_bad_git_dir, assert!(safe_rel(".git/config").is_err()));
+    t!(path_bad_nested_git, assert!(safe_rel("x/.git/hooks/pre-commit").is_err()));
+
+    // --- dates (checked against an independent implementation)
+    t!(ymd_0, assert_eq!(ymd(0), "1970-01-01"));
+    t!(ymd_86399, assert_eq!(ymd(86399), "1970-01-01"));
+    t!(ymd_86400, assert_eq!(ymd(86400), "1970-01-02"));
+    t!(ymd_951782400, assert_eq!(ymd(951782400), "2000-02-29"));
+    t!(ymd_951868800, assert_eq!(ymd(951868800), "2000-03-01"));
+    t!(ymd_1078012800, assert_eq!(ymd(1078012800), "2004-02-29"));
+    t!(ymd_1709164800, assert_eq!(ymd(1709164800), "2024-02-29"));
+    t!(ymd_1709251200, assert_eq!(ymd(1709251200), "2024-03-01"));
+    t!(ymd_4102444800, assert_eq!(ymd(4102444800), "2100-01-01"));
+    t!(ymd_1794455602, assert_eq!(ymd(1794455602), "2026-11-12"));
+    t!(ymd_1735689600, assert_eq!(ymd(1735689600), "2025-01-01"));
+    t!(ymd_1767225599, assert_eq!(ymd(1767225599), "2025-12-31"));
+    t!(ymd_1767225600, assert_eq!(ymd(1767225600), "2026-01-01"));
+    t!(ymd_978307200, assert_eq!(ymd(978307200), "2001-01-01"));
+    t!(ymd_1234567890, assert_eq!(ymd(1234567890), "2009-02-13"));
+
+    // --- frontmatter
+    t!(fm_none, assert_eq!(split_fm("hello").1, "hello"));
+    t!(fm_none_map_empty, assert!(split_fm("hello").0.is_empty()));
+    t!(fm_unterminated, assert_eq!(split_fm("---\nid: a\nno end").1, "---\nid: a\nno end"));
+    t!(fm_basic, {
+        let (m, b) = split_fm("---\nid: a\n---\n\nbody");
+        assert_eq!((m["id"].as_str(), b), ("a", "body"));
+    });
+    t!(fm_value_with_colon, assert_eq!(split_fm("---\nsource: https://x.y/z\n---\nb").0["source"], "https://x.y/z"));
+    t!(fm_quoted_value, assert_eq!(split_fm("---\ntitle: \"Hello\"\n---\nb").0["title"], "Hello"));
+    t!(fm_multiple_keys, assert_eq!(split_fm("---\na: 1\nb: 2\nc: 3\n---\nx").0.len(), 3));
+    t!(fm_body_keeps_dashes, assert_eq!(split_fm("---\na: 1\n---\nx\n---\ny").1, "x\n---\ny"));
+    t!(list_empty, assert!(list("[]").is_empty()));
+    t!(list_one, assert_eq!(list("[a]"), ["a"]));
+    t!(list_two, assert_eq!(list("[a, b]"), ["a", "b"]));
+    t!(list_bare, assert_eq!(list("a,b"), ["a", "b"]));
+    t!(list_quoted, assert_eq!(list("[\"a\", \"b\"]"), ["a", "b"]));
+    t!(list_spaced, assert_eq!(list(" [ a , b ] "), ["a", "b"]));
+    t!(set_fm_replace, assert!(set_fm("---\nstatus: active\n---\nx", "status", "superseded").contains("status: superseded")));
+    t!(set_fm_replace_removes_old, assert!(!set_fm("---\nstatus: active\n---\nx", "status", "done").contains("active")));
+    t!(set_fm_add, assert!(set_fm("---\nid: a\n---\nx", "valid_to", "2026-01-01").contains("valid_to: 2026-01-01")));
+    t!(set_fm_keeps_body, assert!(set_fm("---\nid: a\n---\n\nhello", "k", "v").ends_with("hello")));
+    t!(set_fm_creates_block, assert!(set_fm("no fm", "k", "v").starts_with("---\nk: v\n---\n")));
+    t!(set_fm_unterminated_untouched, assert_eq!(set_fm("---\nid: a", "k", "v"), "---\nid: a"));
+    t!(set_fm_roundtrip, {
+        let t = set_fm(&set_fm("---\nid: a\n---\nb", "x", "1"), "y", "2");
+        let (m, b) = split_fm(&t);
+        assert_eq!((m["id"].as_str(), m["x"].as_str(), m["y"].as_str(), b), ("a", "1", "2", "b"));
+    });
+
+    // --- hashing
+    t!(sha_empty, assert_eq!(sha(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
+    t!(sha_abc, assert_eq!(sha(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+
     #[test]
     fn file_lock_fallback() {
         let d = std::env::temp_dir().join(format!("smug-lock-{}", std::process::id()));
@@ -258,16 +367,5 @@ mod tests {
         f.set_modified(SystemTime::now() - Duration::from_secs(120)).unwrap();
         assert!(Lock::take_by_file(&d, 100, 30).is_ok());
         let _ = fs::remove_dir_all(&d);
-    }
-    #[test]
-    fn dates_and_frontmatter() {
-        assert_eq!(ymd(0), "1970-01-01");
-        assert_eq!(ymd(1794455602), "2026-11-12");
-        let (m, body) = split_fm("---\nid: a\ndepends_on: [x, y]\n---\n\nhello");
-        assert_eq!((m["id"].as_str(), body), ("a", "hello"));
-        assert_eq!(list(&m["depends_on"]), ["x", "y"]);
-        let t = set_fm("---\nid: a\nstatus: active\n---\n\nhello", "status", "superseded");
-        assert!(t.contains("status: superseded") && !t.contains("active") && t.ends_with("hello"));
-        assert!(set_fm("no fm", "k", "v").starts_with("---\nk: v\n---\n"));
     }
 }

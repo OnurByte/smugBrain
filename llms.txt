@@ -1,0 +1,8 @@
+# smugBrain
+
+> Local-first memory for AI coding agents (Claude Code, Codex, Hermes). Plain Markdown notes plus one Rust binary, `smug`, that records decisions with sources, never returns superseded decisions, previews what a change will break, and refuses to apply it if your eval questions regress. Linux, macOS, Windows, FreeBSD, Haiku. No account, no cloud. Public domain (Unlicense).
+
+- [README](https://github.com/OnurByte/smugbrain/blob/main/README.md): install, commands, comparison
+- [Design](https://github.com/OnurByte/smugbrain/blob/main/docs/design.md): data model, guarantees, limits
+- [Releases](https://github.com/OnurByte/smugbrain/releases/latest): prebuilt binaries with SHA256SUMS
+- [Changelog](https://github.com/OnurByte/smugbrain/blob/main/CHANGELOG.md)

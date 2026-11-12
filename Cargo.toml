@@ -1,8 +1,13 @@
 [package]
 name = "smug"
-version = "0.3.1"
+version = "1.0.0"
 edition = "2021"
-description = "smugBrain: plain-Markdown memory for agents. One binary, redb + Tantivy."
+description = "Local-first memory for AI coding agents: Markdown notes, decisions with sources, stale-decision guard, change-impact preview and eval gate. One binary."
+repository = "https://github.com/OnurByte/smugbrain"
+homepage = "https://github.com/OnurByte/smugbrain"
+readme = "README.md"
+keywords = ["agent-memory", "markdown", "knowledge-management", "ai-agents", "cli"]
+categories = ["command-line-utilities", "text-processing"]
 license = "Unlicense"
 
 [dependencies]
