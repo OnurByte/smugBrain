@@ -50,6 +50,9 @@ pub fn guard_for_file(notes: &[mem::Note], file: &str) -> Vec<String> {
 }
 
 pub fn hook(root: &Path, a: &[String]) -> R {
+    if !is_vault(root) {
+        return Ok(0); // a hook fired in some other project: stay silent, touch nothing
+    }
     let mut s = String::new();
     let _ = std::io::stdin().read_to_string(&mut s);
     let input: Value = serde_json::from_str(&s).unwrap_or_default();

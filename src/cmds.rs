@@ -138,6 +138,9 @@ pub fn reindex(root: &Path) -> R {
 }
 
 pub fn context(root: &Path) -> R {
+    if !is_vault(root) {
+        return Ok(0);
+    }
     let mut out = String::new();
     for f in ["Core", "Rules", "Last-Session", "Threads"] {
         if let Ok(t) = fs::read_to_string(root.join(format!("850-companion/{f}.md"))) {
@@ -166,6 +169,11 @@ pub fn doctor(root: &Path) -> R {
     check(root.join("850-companion/Core.md").exists(), "850-companion/Core.md present");
     check(fs::read_to_string(root.join(".gitignore")).map(|g| g.contains(".secrets") && g.contains(".smug")).unwrap_or(false), ".gitignore covers .secrets and .smug");
     let st = State::open(root)?;
+    let mut leftovers = vec![];
+    walk(root, &[".git", ".smug", ".secrets", ".obsidian"], &mut leftovers);
+    leftovers.retain(|f| f.file_name().is_some_and(|n| n.to_string_lossy().contains(".smug-tmp-")));
+    leftovers.iter().for_each(|f| { let _ = fs::remove_file(f); }); // we hold the vault lock, so no writer owns these
+    check(true, &format!("{} leftover temp file(s) from interrupted writes removed", leftovers.len()));
     // crash recovery: an intent with no commit is either finished (file matches) or aborted
     let dangling = st.dangling()?;
     for e in &dangling {
@@ -200,12 +208,18 @@ pub fn setup(root: &Path, a: &[String]) -> R {
             };
             let hooks = cfg.as_object_mut().ok_or("settings.json is not an object")?.entry("hooks").or_insert_with(|| json!({}));
             let hooks = hooks.as_object_mut().ok_or("hooks is not an object")?;
+            let exe = std::env::current_exe().map(|e| e.to_string_lossy().to_string()).unwrap_or_else(|_| "smug".into());
+            let vault = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf()).to_string_lossy().trim_start_matches("\\\\?\\").to_string();
+            let base = format!("\"{exe}\" --vault \"{vault}\"");
             let mut added = vec![];
-            for (event, cmd, matcher) in [("SessionStart", "smug context", None), ("UserPromptSubmit", "smug hook prompt", None), ("PreToolUse", "smug hook pre-edit", Some("Edit|Write|MultiEdit")), ("Stop", "smug hook stop", None), ("SessionEnd", "smug hook session-end", None), ("PreCompact", "smug hook pre-compact", None)] {
+            for (event, sub, matcher) in [("SessionStart", "context", None), ("UserPromptSubmit", "hook prompt", None), ("PreToolUse", "hook pre-edit", Some("Edit|Write|MultiEdit")), ("Stop", "hook stop", None), ("SessionEnd", "hook session-end", None), ("PreCompact", "hook pre-compact", None)] {
+                let cmd = format!("{base} {sub}");
                 let arr = hooks.entry(event).or_insert_with(|| json!([])).as_array_mut().ok_or("a hook event is not an array")?;
-                if arr.iter().any(|e| e.to_string().contains(cmd)) {
-                    continue; // already there: never duplicate, never touch the user's own hooks
+                if arr.iter().any(|e| e.to_string().contains(&serde_json::to_string(&cmd).unwrap_or_default()[1..serde_json::to_string(&cmd).unwrap_or_default().len() - 1])) {
+                    continue; // exactly ours already: nothing to do
                 }
+                // an older smug entry for the same hook (no --vault) is replaced; the user's own hooks are never touched
+                arr.retain(|e| { let s = e.to_string(); !(s.contains("smug") && s.contains(&format!(" {sub}\""))) });
                 let mut entry = json!({"hooks": [{"type": "command", "command": cmd}]});
                 if let Some(m) = matcher {
                     entry["matcher"] = json!(m);

@@ -24,7 +24,18 @@ fn main() {
         }
         eprintln!("smug: internal error: {m}");
     }));
-    let a: Vec<String> = env::args().skip(1).collect();
+    let mut a: Vec<String> = env::args().skip(1).collect();
+    // global option: --vault <dir> (anywhere), so a tool started from another project still finds the right memory
+    if let Some(i) = a.iter().position(|x| x == "--vault") {
+        match a.get(i + 1) {
+            Some(v) => env::set_var("SMUG_VAULT", v),
+            None => {
+                eprintln!("smug: --vault needs a directory");
+                exit(1)
+            }
+        }
+        a.drain(i..=i + 1);
+    }
     let rest = a.get(1..).unwrap_or(&[]);
     let root = vault();
     let r = match a.first().map(String::as_str) {

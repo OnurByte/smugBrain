@@ -3,6 +3,7 @@
 use crate::{learn, mem, store::State, util::*};
 use serde_json::{json, Value};
 use std::{
+    fs,
     io::{BufRead, Write},
     path::Path,
 };
@@ -38,7 +39,7 @@ fn call(root: &Path, read_only: bool, name: &str, a: &Value) -> Result<Value, St
             let st = State::open(root).map_err(e)?;
             let hits = mem::search_valid(root, &st, q, k, false).map_err(e)?;
             let warnings = mem::warn_texts(&mem::load_notes(root), q);
-            Ok(json!({"notes": hits.iter().map(|h| json!({"path": h.path, "snippet": h.snippet})).collect::<Vec<_>>(), "warnings": warnings,
+            Ok(json!({"vault": fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf()).to_string_lossy().trim_start_matches("\\\\?\\").to_string(), "notes": hits.iter().map(|h| json!({"path": h.path, "snippet": h.snippet})).collect::<Vec<_>>(), "warnings": warnings,
                 "note": if hits.is_empty() { "no relevant memory" } else { "candidates: open the note before relying on it" }}))
         }
         "smug_check" => {
@@ -118,6 +119,10 @@ pub fn handle(root: &Path, read_only: bool, msg: &Value) -> Option<Value> {
 }
 
 pub fn serve(root: &Path, args: &[String]) -> R {
+    if !is_vault(root) {
+        eprintln!("smug mcp: {} is not a smug vault. Start it with --vault <dir> (smug agent install does this for you).", root.display());
+        return Ok(1);
+    }
     let read_only = args.iter().any(|a| a == "--read-only");
     let stdin = std::io::stdin();
     let mut out = std::io::stdout();

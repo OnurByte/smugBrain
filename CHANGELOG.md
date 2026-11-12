@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.1 (2026-11-12)
+
+Fixes from an external review of 1.1.0, plus a much larger test suite.
+
+- **The vault path is now explicit.** `smug agent install` writes `--vault <absolute path>` into every tool's MCP config and into the Claude Code hooks, and there is a global `--vault <dir>` option. A tool started from another project can no longer look in (or write into) the wrong directory.
+- **smug refuses to run in a directory that is not a vault** (no `850-companion/` folder, no journal): no stray `.smug/` or `history/` in your projects; hooks stay silent there; `smug mcp` exits with a clear message.
+- `smug agent doctor` now starts the server like a tool would, from a different directory with no environment variable, and checks it serves the right vault.
+- A damaged or truncated `state.redb` is set aside and rebuilt from the journal; `doctor` removes temp files left by killed writers.
+- Older smug hook entries are upgraded in place, never duplicated; your own hooks are untouched.
+- **Live-tested:** Codex CLI 0.167.2 and OpenCode 2.2.7 each called smug over MCP in a real session.
+- Tests: fuzzing of the MCP server, CLI arguments, hook inputs and the parsers; SIGKILL bursts; 12 writers + 4 readers; vault paths with spaces, Unicode, symlinks, relative paths; corrupt state, journal and index files.
+
+
 ## 1.1.0 (2026-11-12)
 
 The agent layer. smug now meets agents where they work.
@@ -11,7 +24,7 @@ The agent layer. smug now meets agents where they work.
 - **Session isolation**: hook state lives under `.smug/sessions/<hash>/`; two agents on one vault no longer overwrite each other. `smug receipts`.
 - **Learning loop**: `capture`, `learn --propose`, `review`, `promote`, `reject`; `SessionEnd` and `PreCompact` capture sessions with secret-shaped lines redacted. Nothing becomes memory without a human.
 - **Model eval, isolated**: the model command runs in a throwaway directory with a timeout and an output cap. `smug eval --ab` measures the same model with memory on and off.
-- 363 automated tests (a few Unix-only ones are skipped on Windows).
+- 420 automated tests (a few Unix-only ones are skipped on Windows).
 
 ## 1.0.1 (not released separately)
 

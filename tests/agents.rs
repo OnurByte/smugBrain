@@ -177,14 +177,21 @@ t!(agent_list_shows_ten_tools, {
         assert!(o.contains(w), "{w}");
     }
 });
-t!(agent_list_never_claims_live_testing, assert!(!install(&vault("al2"), &home("al2"), &["list"]).1.contains("live-tested")));
+t!(agent_list_claims_live_testing_only_where_it_happened, {
+    let o = install(&vault("al2"), &home("al2"), &["list"]).1;
+    for l in o.lines() {
+        let live = l.contains("live-tested");
+        assert_eq!(live, l.starts_with("codex") || l.starts_with("opencode"), "{l}");
+    }
+});
 t!(agent_unknown_id_errors, assert_eq!(install(&vault("au"), &home("au"), &["install", "emacs"]).0, 1));
 t!(agent_install_needs_a_target, assert_eq!(install(&vault("an"), &home("an"), &["install"]).0, 1));
 t!(agent_claude_project_config_is_created, {
     let (v, h) = (vault("ac"), home("ac"));
     assert_eq!(install(&v, &h, &["install", "claude-code"]).0, 0);
     let j = json_of(&v.join(".mcp.json"));
-    assert_eq!(j["mcpServers"]["smug"]["args"], json!(["mcp"]));
+    assert_eq!(j["mcpServers"]["smug"]["args"][0], "mcp");
+    assert_eq!(j["mcpServers"]["smug"]["args"][1], "--vault");
     assert!(j["mcpServers"]["smug"]["command"].as_str().unwrap().contains("smug"));
 });
 t!(agent_claude_also_gets_hooks_and_skill, {
@@ -248,7 +255,7 @@ t!(agent_codex_writes_toml_and_keeps_the_rest, {
     fs::write(h.join(".codex/config.toml"), "# my config\nmodel = \"gpt\"\n\n[mcp_servers.other]\ncommand = \"x\"\n").unwrap();
     assert_eq!(install(&v, &h, &["install", "codex", "--global"]).0, 0);
     let t = fs::read_to_string(h.join(".codex/config.toml")).unwrap();
-    assert!(t.contains("# my config") && t.contains("model = \"gpt\"") && t.contains("[mcp_servers.other]") && t.contains("[mcp_servers.smug]") && t.contains("args = [\"mcp\"]"), "{t}");
+    assert!(t.contains("# my config") && t.contains("model = \"gpt\"") && t.contains("[mcp_servers.other]") && t.contains("[mcp_servers.smug]") && t.contains("args = [\"mcp\", \"--vault\""), "{t}");
     assert!(fs::read_to_string(v.join("AGENTS.md")).unwrap().contains("## smug"));
 });
 t!(agent_codex_toml_idempotent, {
@@ -357,7 +364,7 @@ t!(setup_claude_merges_into_existing_settings, {
     let s = json_of(&v.join(".claude/settings.json"));
     assert_eq!(s["theme"], "dark");
     let stop = s["hooks"]["Stop"].to_string();
-    assert!(stop.contains("my-own-hook") && stop.contains("smug hook stop"));
+    assert!(stop.contains("my-own-hook") && stop.contains("hook stop"));
 });
 t!(setup_claude_is_idempotent, {
     let v = vault("sm2");

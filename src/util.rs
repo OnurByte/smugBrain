@@ -16,6 +16,12 @@ pub fn vault() -> PathBuf {
     PathBuf::from(env::var("SMUG_VAULT").unwrap_or_else(|_| ".".into()))
 }
 
+/// A smug vault has a companion folder (made by `smug init`) or a journal. Anything else is somebody's project:
+/// smug must not scatter .smug/ and history/ into it.
+pub fn is_vault(root: &Path) -> bool {
+    root.join("850-companion").is_dir() || root.join("history/events.jsonl").is_file()
+}
+
 pub fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
 }

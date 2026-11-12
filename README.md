@@ -91,7 +91,7 @@ Also: `windsurf --global`, `kiro`, `vscode`, `opencode`. Zed and Cline print a s
 <details>
 <summary><b>What "supported" means here</b></summary>
 
-Every setup tool above has automated tests for how smug edits its config, and the MCP server is tested with a scripted client over stdio (`smug agent doctor` runs the same check on your machine). We have **not** yet run a live session in each tool, so we do not claim that. Lifecycle hooks (session start, before-edit reminders, capture) exist for Claude Code only; the other tools get the memory tools. `smug agent list` prints the exact test level per tool.
+**Live-tested** (a real session of the tool calling smug over MCP, on Linux, 2026-11-12): **Codex CLI 0.167.2** and **OpenCode 2.2.7**. Every setup tool above also has automated tests for how smug edits its config, and the MCP server is tested with a scripted client (`smug agent doctor` runs that check on your machine, from a different directory, to prove the vault path is right). **Claude Code** was not live-tested: its CLI was not logged in where we tested. Lifecycle hooks (session start, before-edit reminders, capture) are installed for Claude Code only; Codex runs hooks too, and smug does not install them there yet. `smug agent list` prints the exact test level per tool.
 
 </details>
 
@@ -184,9 +184,9 @@ Markdown notes. State in [redb](https://github.com/cberner/redb), search in [Tan
 
 - The model in `eval` is whatever command you supply; smug bundles none and the command runs with your privileges (throwaway directory, timeout and output cap, but not a sandbox).
 - `bench` and `eval` run on your own cases; there is no independent public benchmark.
-- Hooks exist for Claude Code only. Other tools get the MCP tools.
+- Hooks are installed for Claude Code only; Codex has hooks of its own that smug does not wire yet. Other tools get the MCP tools.
 - Automatic feedback is a heuristic: a surfaced note counts as used when its file name appears in what the assistant wrote or did.
-- Live sessions in each listed tool have not been run; see "What supported means here".
+- Only Codex CLI and OpenCode were live-tested (one session each); see "What supported means here".
 
 </details>
 

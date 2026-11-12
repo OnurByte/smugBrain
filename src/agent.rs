@@ -30,24 +30,26 @@ const S: Shape = Shape::Servers { key: "mcpServers", typed: false };
 
 const ALL: &[Adapter] = &[
     Adapter { id: "claude-code", label: "Claude Code", shape: S, project: Some(".mcp.json"), global: Some(".claude.json"), detect: Some(".claude"), support: "MCP config tested, hooks + skill installed, protocol tested with a test client" },
-    Adapter { id: "codex", label: "Codex CLI", shape: Shape::Toml, project: None, global: Some(".codex/config.toml"), detect: Some(".codex"), support: "MCP config tested, AGENTS.md instructions" },
+    Adapter { id: "codex", label: "Codex CLI", shape: Shape::Toml, project: None, global: Some(".codex/config.toml"), detect: Some(".codex"), support: "live-tested: Codex CLI 0.167.2, Linux, one session (smug_check over MCP); config tested; AGENTS.md instructions" },
     Adapter { id: "cursor", label: "Cursor", shape: S, project: Some(".cursor/mcp.json"), global: Some(".cursor/mcp.json"), detect: Some(".cursor"), support: "MCP config tested" },
     Adapter { id: "gemini", label: "Gemini CLI", shape: S, project: Some(".gemini/settings.json"), global: Some(".gemini/settings.json"), detect: Some(".gemini"), support: "MCP config tested" },
     Adapter { id: "windsurf", label: "Windsurf", shape: S, project: None, global: Some(".codeium/windsurf/mcp_config.json"), detect: Some(".codeium/windsurf"), support: "MCP config tested" },
     Adapter { id: "kiro", label: "Kiro", shape: S, project: Some(".kiro/settings/mcp.json"), global: Some(".kiro/settings/mcp.json"), detect: Some(".kiro"), support: "MCP config tested" },
     Adapter { id: "vscode", label: "VS Code", shape: Shape::Servers { key: "servers", typed: true }, project: Some(".vscode/mcp.json"), global: None, detect: None, support: "MCP config tested" },
-    Adapter { id: "opencode", label: "OpenCode", shape: Shape::OpenCode, project: Some("opencode.json"), global: Some(".config/opencode/opencode.json"), detect: Some(".config/opencode"), support: "MCP config tested" },
+    Adapter { id: "opencode", label: "OpenCode", shape: Shape::OpenCode, project: Some("opencode.json"), global: Some(".config/opencode/opencode.json"), detect: Some(".config/opencode"), support: "live-tested: OpenCode 2.2.7, Linux, one session (smug_check over MCP); config tested" },
     Adapter { id: "zed", label: "Zed", shape: Shape::PrintOnly, project: None, global: None, detect: None, support: "manual: prints the snippet (settings.json allows comments)" },
     Adapter { id: "cline", label: "Cline", shape: Shape::PrintOnly, project: None, global: None, detect: None, support: "manual: prints the snippet" },
 ];
 
-fn launch() -> (String, Vec<String>) {
+/// What a tool should run. The vault is passed explicitly: a tool started from another project must not look in its cwd.
+fn launch(root: &Path) -> (String, Vec<String>) {
     let exe = std::env::current_exe().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|_| "smug".into());
-    (exe, vec!["mcp".into()])
+    let vault = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf()).to_string_lossy().trim_start_matches("\\\\?\\").to_string();
+    (exe, vec!["mcp".into(), "--vault".into(), vault])
 }
 
-fn entry(a: &Adapter, nested: bool) -> Value {
-    let (cmd, args) = launch();
+fn entry(a: &Adapter, nested: bool, root: &Path) -> Value {
+    let (cmd, args) = launch(root);
     let argv: Vec<String> = std::iter::once(cmd.clone()).chain(args.clone()).collect();
     match a.shape {
         Shape::Servers { typed: true, .. } => json!({"type": "stdio", "command": cmd, "args": args}),
@@ -57,12 +59,12 @@ fn entry(a: &Adapter, nested: bool) -> Value {
     }
 }
 
-fn snippet(a: &Adapter) -> String {
-    let (cmd, args) = launch();
+fn snippet(a: &Adapter, root: &Path) -> String {
+    let (cmd, args) = launch(root);
     match a.shape {
         Shape::Toml => format!("[mcp_servers.{NAME}]\ncommand = {}\nargs = {}\n", serde_json::to_string(&cmd).unwrap_or_default(), serde_json::to_string(&args).unwrap_or_default()),
-        Shape::OpenCode => serde_json::to_string_pretty(&json!({"mcp": {"servers": {NAME: entry(a, true)}}})).unwrap_or_default(),
-        Shape::Servers { key, .. } => serde_json::to_string_pretty(&json!({key: {NAME: entry(a, false)}})).unwrap_or_default(),
+        Shape::OpenCode => serde_json::to_string_pretty(&json!({"mcp": {"servers": {NAME: entry(a, true, root)}}})).unwrap_or_default(),
+        Shape::Servers { key, .. } => serde_json::to_string_pretty(&json!({key: {NAME: entry(a, false, root)}})).unwrap_or_default(),
         Shape::PrintOnly => serde_json::to_string_pretty(&json!({NAME: {"command": cmd, "args": args}})).unwrap_or_default(),
     }
 }
@@ -80,7 +82,7 @@ fn path_for(a: &Adapter, global: bool, home: &Path, repo: &Path) -> Option<PathB
     if global { a.global.map(|p| home.join(p)) } else { a.project.map(|p| repo.join(p)) }
 }
 
-fn edit_json(existing: Option<&str>, a: &Adapter, force: bool, remove: bool) -> Result<Option<String>, String> {
+fn edit_json(existing: Option<&str>, a: &Adapter, force: bool, remove: bool, vroot: &Path) -> Result<Option<String>, String> {
     let mut root: Value = match existing {
         Some(t) if !t.trim().is_empty() => serde_json::from_str(t).map_err(|e| format!("not valid JSON ({e}); it may contain comments"))?,
         _ => json!({}),
@@ -99,7 +101,7 @@ fn edit_json(existing: Option<&str>, a: &Adapter, force: bool, remove: bool) -> 
         }
         _ => return Err("not a JSON adapter".into()),
     };
-    let want = entry(a, nested);
+    let want = entry(a, nested, vroot);
     if remove {
         return Ok(container.remove(NAME).map(|_| serde_json::to_string_pretty(&root).unwrap_or_default() + "\n"));
     }
@@ -112,9 +114,9 @@ fn edit_json(existing: Option<&str>, a: &Adapter, force: bool, remove: bool) -> 
     Ok(Some(serde_json::to_string_pretty(&root).unwrap_or_default() + "\n"))
 }
 
-fn edit_toml(existing: Option<&str>, force: bool, remove: bool) -> Result<Option<String>, String> {
+fn edit_toml(existing: Option<&str>, force: bool, remove: bool, root: &Path) -> Result<Option<String>, String> {
     let mut doc: DocumentMut = existing.unwrap_or("").parse().map_err(|e| format!("not valid TOML ({e})"))?;
-    let (cmd, args) = launch();
+    let (cmd, args) = launch(root);
     if remove {
         let had = doc.get("mcp_servers").and_then(|t| t.as_table()).is_some_and(|t| t.contains_key(NAME));
         if had {
@@ -144,13 +146,13 @@ fn edit_toml(existing: Option<&str>, force: bool, remove: bool) -> Result<Option
 
 fn run(a: &Adapter, global: bool, home: &Path, repo: &Path, dry: bool, force: bool, remove: bool) -> Outcome {
     if a.shape == Shape::PrintOnly {
-        return Outcome::Refused(format!("{} needs a manual edit ({}). Add this:\n{}", a.label, a.support, snippet(a)));
+        return Outcome::Refused(format!("{} needs a manual edit ({}). Add this:\n{}", a.label, a.support, snippet(a, repo)));
     }
     let Some(path) = path_for(a, global, home, repo) else {
-        return Outcome::Refused(format!("{} has no {} config location. Add this by hand:\n{}", a.label, if global { "global" } else { "project" }, snippet(a)));
+        return Outcome::Refused(format!("{} has no {} config location. Add this by hand:\n{}", a.label, if global { "global" } else { "project" }, snippet(a, repo)));
     };
     if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
-        return Outcome::Refused(format!("{} is a symbolic link, left untouched. Edit its target by hand:\n{}", path.display(), snippet(a)));
+        return Outcome::Refused(format!("{} is a symbolic link, left untouched. Edit its target by hand:\n{}", path.display(), snippet(a, repo)));
     }
     let existing = match fs::read_to_string(&path) {
         Ok(t) => Some(t),
@@ -158,11 +160,11 @@ fn run(a: &Adapter, global: bool, home: &Path, repo: &Path, dry: bool, force: bo
         Err(e) => return Outcome::Refused(format!("cannot read {}: {e}", path.display())),
     };
     let edited = match a.shape {
-        Shape::Toml => edit_toml(existing.as_deref(), force, remove),
-        _ => edit_json(existing.as_deref(), a, force, remove),
+        Shape::Toml => edit_toml(existing.as_deref(), force, remove, repo),
+        _ => edit_json(existing.as_deref(), a, force, remove, repo),
     };
     match edited {
-        Err(m) => Outcome::Refused(format!("{}: {m}. Nothing was written. Add this by hand:\n{}", path.display(), snippet(a))),
+        Err(m) => Outcome::Refused(format!("{}: {m}. Nothing was written. Add this by hand:\n{}", path.display(), snippet(a, repo))),
         Ok(None) => Outcome::Unchanged(path),
         Ok(Some(text)) => {
             if !dry {
@@ -265,25 +267,35 @@ pub fn agent(root: &Path, a: &[String]) -> R {
             Ok(0)
         }
         "doctor" => {
-            // starts `smug mcp` and asks it, the way a harness would
+            // Starts the server exactly as a tool would (same command, same --vault) but from a DIFFERENT directory and
+            // without SMUG_VAULT: if the vault path were not passed explicitly, this is where it would break.
             use std::io::{BufRead, BufReader, Write};
-            let (cmd, args) = launch();
-            let mut ch = std::process::Command::new(cmd).args(args).env("SMUG_VAULT", root).stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null()).spawn()?;
+            let (cmd, args) = launch(root);
+            let want = args[2].clone();
+            let mut ch = std::process::Command::new(cmd).args(args).current_dir(std::env::temp_dir()).env_remove("SMUG_VAULT").stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn()?;
             let mut stdin = ch.stdin.take().unwrap();
             writeln!(stdin, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"doctor","version":"0"}}}}}}"#)?;
             writeln!(stdin, r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}"#)?;
+            writeln!(stdin, r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"smug_recall","arguments":{{"query":"doctor"}}}}}}"#)?;
             drop(stdin);
-            let mut tools = 0;
+            let (mut tools, mut vault_seen, mut recall_ok) = (0, String::new(), false);
             for l in BufReader::new(ch.stdout.take().unwrap()).lines().map_while(Result::ok) {
                 if let Ok(v) = serde_json::from_str::<Value>(&l) {
-                    if v["id"] == 2 {
-                        tools = v["result"]["tools"].as_array().map(|t| t.len()).unwrap_or(0);
+                    match v["id"].as_u64() {
+                        Some(2) => tools = v["result"]["tools"].as_array().map(|t| t.len()).unwrap_or(0),
+                        Some(3) => {
+                            recall_ok = v["result"]["isError"] == false;
+                            vault_seen = v["result"]["structuredContent"]["vault"].as_str().unwrap_or("").to_string();
+                        }
+                        _ => {}
                     }
                 }
             }
             let _ = ch.wait();
+            let right_vault = vault_seen == want;
             println!("{} smug mcp answers: {tools} tools", if tools == 6 { "ok  " } else { "FAIL" });
-            Ok(if tools == 6 { 0 } else { 1 })
+            println!("{} serves the right vault from any directory: {}", if right_vault && recall_ok { "ok  " } else { "FAIL" }, if vault_seen.is_empty() { "(no answer)".into() } else { vault_seen });
+            Ok(if tools == 6 && right_vault && recall_ok { 0 } else { 1 })
         }
         _ => Err("usage: smug agent list|install|uninstall|doctor".into()),
     }

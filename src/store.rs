@@ -31,8 +31,19 @@ fn journal(root: &Path) -> PathBuf {
 
 impl State {
     pub fn open(root: &Path) -> Res<State> {
+        if !is_vault(root) {
+            return Err(format!("{} is not a smug vault. Run `smug init <dir>`, or point smug at one with --vault <dir>.", root.display()).into());
+        }
         let lock = Lock::take(root, 8000)?;
-        let db = Database::create(root.join(".smug/state.redb"))?;
+        let path = root.join(".smug/state.redb");
+        let db = match Database::create(&path) {
+            Ok(d) => d,
+            Err(_) => {
+                // a damaged state file is disposable: set it aside, start clean, the journal and the Markdown rebuild everything
+                let _ = fs::rename(&path, root.join(".smug/state.redb.corrupt"));
+                Database::create(&path)?
+            }
+        };
         let w = db.begin_write()?;
         {
             w.open_table(EVENTS)?;

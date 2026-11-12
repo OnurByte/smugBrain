@@ -52,7 +52,7 @@ save("banner.svg", b)
 
 # ---------- 1.2 stats ----------
 rows = [("100%", "of your notes are plain Markdown", 100, "Open, copy, print, or leave any time."),
-        ("363", "automated tests, all green", 0, "Linux, macOS, Windows in CI. FreeBSD and Haiku run them at release."),
+        ("420", "automated tests, all green", 0, "Linux, macOS, Windows in CI. FreeBSD and Haiku run them at release."),
         ("0", "files lost with 8 writers at once", 0, "1 write accepted, 7 refused on hash conflict. Automated test."),
         ("21 ms", "to search 2,000 notes", 0, "Tantivy index, warm. First build 139 ms. Synthetic vault."),
         ("7 MB", "one binary, nothing else to install", 0, "No Python. No Node. No C library. No server. No account.")]
@@ -91,14 +91,14 @@ for i, (lab, vals) in enumerate(rows):
         body += t(x, y + 8, v, 11.5, 700 if j == 0 else 300, PAPER if j == 0 else (GRAY if v.startswith(("—",)) else INK), "middle")
 body += t(100, 716, "Checked 2026-11-12: licenses via the GitHub API, the rest from each project's README. \"—\" = not found there (may live in code or other docs).", 11, 300, GRAY)
 body += t(100, 738, "Where they lead today: community size, live-tested agent integrations (hafiza-os: Claude Code, Codex, Antigravity), built-in semantic search,", 11, 700, INK)
-body += t(100, 754, "and test volume (avenoxbeyin reports 2,316; smug has 363, hafiza-os reports 360). smug --deep hands semantic queries to QMD.", 11, 700, INK)
+body += t(100, 754, "and test volume (avenoxbeyin reports 2,316; smug has 420, hafiza-os reports 360). smug --deep hands semantic queries to QMD.", 11, 700, INK)
 save("card-compare.svg", page(810, "How we compare", "1.2", body))
 
 
 # ---------- badges (our own, not shields.io) ----------
 import re as _re
 VERSION = _re.search(r'^version = "([^"]+)"', (A.parent / "Cargo.toml").read_text(), _re.M).group(1)
-TESTS = 363  # update with every release: cargo test (Unix)
+TESTS = 420  # update with every release: cargo test (Unix)
 badges = [("release", f"v{VERSION}", True), ("tests", f"{TESTS} passing", False), ("license", "public domain", True),
           ("written in", "Rust", False), ("tested on", "Linux macOS Windows FreeBSD Haiku", False), ("speaks", "MCP", True),
           ("needs", "no account, no cloud", False)]
@@ -151,6 +151,7 @@ for i, (name, f, tier) in enumerate(tools + [("and more", None, 3)]):
         body += f'<rect x="{x}" y="{y}" width="{TW}" height="5" fill="{bar[tier]}"/>'
         body += logo(f, x + (TW - 34) / 2, y + 20) if f else t(x + TW / 2, y + 45, "{ }", 24, 700, INK, "middle")
         body += t(x + TW / 2, y + 76, name, 12, 700, INK, "middle")
+        body += t(x + TW / 2, y + 89, "live-tested", 9, 700, RED, "middle") if name in ("Codex", "OpenCode") else ""
     else:
         body += t(x + TW / 2, y + 48, "+ more", 17, 700, RED, "middle") + t(x + TW / 2, y + 68, "any MCP tool", 11, 300, GRAY, "middle")
 ly = 134 + 3 * (TH + 10) + 18
@@ -159,6 +160,6 @@ for k, (c, txt) in enumerate([(RED, "one command sets it up"), (INK, "prints a s
     body += f'<rect x="{lx}" y="{ly-9}" width="18" height="9" fill="{c}"/>' + t(lx + 26, ly, txt, 11.5, 700)
 body += t(100, ly + 34, "smug agent install detected", 15, 700, RED) + t(318, ly + 34, "connects every tool it finds on your computer.", 13, 300)
 body += t(100, ly + 60, "Any tool that can run an MCP server works with the command  smug mcp.", 12, 300, GRAY)
-body += t(100, ly + 78, "Tested: how smug edits each setup tool's config, and the MCP server with a scripted client. A live session in each tool: not yet.", 11, 300, GRAY)
-body += t(100, ly + 94, "Hooks (session start, before-edit reminders, capture) exist for Claude Code only. Logos identify compatibility, not endorsement.", 11, 300, GRAY)
+body += t(100, ly + 78, "Live-tested (one real session each, Linux): Codex CLI 0.167.2, OpenCode 2.2.7. All setup tools: config-edit tests and a scripted MCP client.", 11, 300, GRAY)
+body += t(100, ly + 94, "Hooks (session start, before-edit reminders, capture) are installed for Claude Code only. Logos identify compatibility, not endorsement.", 11, 300, GRAY)
 save("card-clients.svg", page(ly + 120, "Works with", "1.0", body))

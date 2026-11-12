@@ -57,7 +57,7 @@ One core, two doors: the same functions serve the CLI, the hooks and the MCP ser
 - Search is keyword search (BM25 over Tantivy). `smug search --deep` hands the query to [QMD](https://github.com/tobi/qmd) when it is installed; smug has no embedding model of its own.
 - `eval` always checks what retrieval returns. To check what a model answers, pass `--model "<command>"` and add `answer_contains` / `answer_absent` to cases. smug bundles no model, and the command runs through your shell with your privileges.
 - `bench` and `eval` run on your own cases; there is no independent public benchmark.
-- Every listed tool has automated tests for its config edit, and the MCP server is tested with a scripted client. A live session inside each tool has not been run. Lifecycle hooks exist for Claude Code only.
+- Every listed tool has automated tests for its config edit, and the MCP server is tested with a scripted client. Live sessions (2026-11-12, Linux, one `smug_check` call over MCP each): Codex CLI 0.167.2 and OpenCode 2.2.7. Claude Code was not live-tested (its CLI was not logged in where we tested). Lifecycle hooks are installed for Claude Code only; Codex has hooks that smug does not wire yet.
 - The Claude Code hook formats (`additionalContext` for `PreToolUse`, transcript JSONL) follow Anthropic's documented shapes and are tested against synthetic input, not against every Claude Code version.
 - Automatic feedback (`smug hook stop`) credits a surfaced note when its file name appears in the assistant's text or tool calls. It is a heuristic. `smug feedback` records it by hand.
 - Notes are expected to be UTF-8 text.
