@@ -1,18 +1,6 @@
 <p align="center"><img src="assets/banner.svg" alt="smugBrain: local-first memory for AI coding agents" width="880"></p>
 
-<p align="center">
-<a href="https://github.com/OnurByte/smugbrain/releases/latest"><img src="https://img.shields.io/github/v/release/OnurByte/smugbrain?color=D92B2F" alt="Release"></a>
-<a href="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml"><img src="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<img src="https://img.shields.io/badge/tests-363-brightgreen" alt="363 tests">
-<img src="https://img.shields.io/badge/Rust-000?logo=rust&logoColor=white" alt="Rust">
-<img src="https://img.shields.io/badge/license-public%20domain-D92B2F" alt="Public domain">
-<img src="https://img.shields.io/badge/macOS-000?logo=apple&logoColor=white" alt="macOS">
-<img src="https://img.shields.io/badge/Linux-000?logo=linux&logoColor=white" alt="Linux">
-<img src="https://img.shields.io/badge/Windows-0078D6" alt="Windows">
-<img src="https://img.shields.io/badge/FreeBSD-AB2B28?logo=freebsd&logoColor=white" alt="FreeBSD">
-<img src="https://img.shields.io/badge/Haiku-F58220" alt="Haiku">
-<img src="https://img.shields.io/badge/MCP-server-000" alt="MCP server">
-</p>
+<p align="center"><img src="assets/badges.svg" alt="release, tests, license, platforms, MCP" width="880"></p>
 
 # smugBrain: local-first memory for AI coding agents
 
@@ -54,18 +42,27 @@ Restart your coding tool, then ask it: *"Use smug to recall what we decided abou
 
 ### Works with
 
-| Coding tool | Connect it | What you get |
-| --- | --- | --- |
-| **Claude Code** | `smug agent install claude-code` | Memory tools (MCP), memory at session start, **reminders before it edits a file**, automatic capture of the session, a skill that teaches it when to use smug |
-| **Codex CLI** | `smug agent install codex --global` | Memory tools (MCP) and instructions in `AGENTS.md` |
-| **Cursor** | `smug agent install cursor` | Memory tools (MCP) |
-| **Gemini CLI** | `smug agent install gemini` | Memory tools (MCP) |
-| **Windsurf** | `smug agent install windsurf --global` | Memory tools (MCP) |
-| **Kiro** | `smug agent install kiro` | Memory tools (MCP) |
-| **VS Code** | `smug agent install vscode` | Memory tools (MCP) |
-| **OpenCode** | `smug agent install opencode` | Memory tools (MCP) |
-| **Zed, Cline** | `smug agent install zed` | Prints the snippet to paste |
-| **Any MCP client** | command: `smug mcp` | Memory tools (MCP) |
+<p align="center"><img src="assets/card-clients.svg" alt="Works with Claude Code, Codex CLI, Cursor, Gemini CLI, Windsurf, Kiro, VS Code, OpenCode, Zed, Cline and any MCP client" width="880"></p>
+
+Copy the line for your tool:
+
+```bash
+smug agent install claude-code
+```
+
+```bash
+smug agent install codex --global
+```
+
+```bash
+smug agent install cursor
+```
+
+```bash
+smug agent install gemini
+```
+
+Also: `windsurf --global`, `kiro`, `vscode`, `opencode`. Zed and Cline print a snippet to paste. Any other MCP client: use the command `smug mcp`.
 
 **What "supported" means here.** Every row above has automated tests for how smug edits that tool's config, and the MCP server is tested with a scripted client over stdio (`smug agent doctor` runs the same check on your machine). We have **not** yet run a live session in each tool, so we do not claim that. Lifecycle hooks (session start, before-edit reminders, capture) exist for Claude Code only; the other tools get the memory tools. `smug agent list` prints the same table with the exact test level.
 

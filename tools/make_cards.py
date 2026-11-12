@@ -93,3 +93,42 @@ body += t(100, 716, "Checked 2026-11-12: licenses via the GitHub API, the rest f
 body += t(100, 738, "Where they lead today: community size, live-tested agent integrations (hafiza-os: Claude Code, Codex, Antigravity), built-in semantic search,", 11, 700, INK)
 body += t(100, 754, "and test volume (avenoxbeyin reports 2,316; smug has 363, hafiza-os reports 360). smug --deep hands semantic queries to QMD.", 11, 700, INK)
 save("card-compare.svg", page(810, "How we compare", "1.2", body))
+
+
+# ---------- badges (our own, not shields.io) ----------
+import re as _re
+VERSION = _re.search(r'^version = "([^"]+)"', (A.parent / "Cargo.toml").read_text(), _re.M).group(1)
+TESTS = 363  # update with every release: cargo test (Unix)
+badges = [("release", f"v{VERSION}", True), ("tests", f"{TESTS} passing", False), ("license", "public domain", True),
+          ("written in", "Rust", False), ("tested on", "Linux macOS Windows FreeBSD Haiku", False), ("speaks", "MCP", True),
+          ("needs", "no account, no cloud", False)]
+def badge_row(items, y):
+    out, x = "", 100
+    for lab, val, hot in items:
+        lw, vw = 12 + len(lab) * 6.6, 14 + len(val) * 6.9
+        out += (f'<rect x="{x}" y="{y}" width="{lw:.0f}" height="26" fill="{INK}"/>' + t(x + lw / 2, y + 17.5, lab, 11, 700, PAPER, "middle")
+                + f'<rect x="{x+lw:.0f}" y="{y}" width="{vw:.0f}" height="26" fill="{RED if hot else PAPER}" stroke="{INK}"/>'
+                + t(x + lw + vw / 2, y + 17.5, val, 11, 700, PAPER if hot else INK, "middle"))
+        x += lw + vw + 10
+    return out, x
+r1, _ = badge_row(badges[:4], 22)
+r2, _ = badge_row(badges[4:], 58)
+svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 96" width="{W}" height="96" font-family="{FONT}" role="img" aria-label="release, tests, license, platforms, MCP">'
+       f'<rect width="{W}" height="96" fill="{PAPER}"/>' + "".join(f'<circle cx="34" cy="{y}" r="9" fill="{INK}"/>' for y in (22, 74)) + r1 + r2 + "</svg>\n")
+save("badges.svg", svg)
+
+# ---------- clients ----------
+tiles = [("Claude Code", "MCP + hooks + skill", True), ("Codex CLI", "MCP + AGENTS.md", False), ("Cursor", "MCP", False),
+         ("Gemini CLI", "MCP", False), ("Windsurf", "MCP", False), ("Kiro", "MCP", False),
+         ("VS Code", "MCP", False), ("OpenCode", "MCP", False), ("Zed · Cline", "MCP, paste a snippet", False)]
+body = t(100, 112, "Start a task in one tool. Continue in another. Saved lessons stay with the project.", 13, 700)
+for i, (name, what, hot) in enumerate(tiles):
+    x, y = 100 + (i % 3) * 252, 134 + (i // 3) * 92
+    body += f'<rect x="{x}" y="{y}" width="236" height="78" fill="{RED if hot else PAPER}" stroke="{INK}"/>'
+    body += t(x + 16, y + 34, name, 19, 700, PAPER if hot else INK) + t(x + 16, y + 56, what, 12, 300, PAPER if hot else GRAY)
+x, y = 100, 134 + 3 * 92
+body += f'<rect x="{x}" y="{y}" width="740" height="62" fill="{INK}"/>' + t(x + 16, y + 28, "Any other MCP client", 17, 700, PAPER) + t(x + 16, y + 48, "Point it at the command   smug mcp", 12, 300, PAPER)
+body += t(100, 506, "One command connects what it finds:  smug agent install detected", 13, 700, RED)
+body += t(100, 528, "Tested: how smug edits each tool's config, and the MCP server with a scripted client. A live session in each tool: not yet.", 11, 300, GRAY)
+body += t(100, 544, "Hooks (session start, before-edit reminders, capture) exist for Claude Code only.", 11, 300, GRAY)
+save("card-clients.svg", page(572, "Works with", "1.0", body))
