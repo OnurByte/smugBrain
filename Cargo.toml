@@ -1,6 +1,6 @@
 [package]
 name = "smug"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2021"
 description = "Local-first memory for AI coding agents: Markdown notes, decisions with sources, stale-decision guard, change-impact preview and eval gate. One binary."
 repository = "https://github.com/OnurByte/smugbrain"

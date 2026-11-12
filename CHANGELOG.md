@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.2 (2026-11-12)
+
+Bug-hunt release: six real bugs, each with a regression test.
+
+- Search no longer fails on a bare `AND`, `OR` or `NOT`; a query error also no longer wipes and rebuilds the index.
+- Notes with CRLF line endings (git `autocrlf` on Windows) now have their frontmatter read.
+- `impact` follows `[[id#heading]]` links.
+- `smug patch` numbers patches by the highest existing number, so deleting an earlier patch no longer blocks new ones.
+- `--date` and `--known-at` must be `YYYY-MM-DD`.
+- A NUL byte can no longer hide a secret from the write guard: `smug write` and proposals refuse NUL content.
+- A second capture in the same session (pre-compact, then session-end) appends instead of overwriting the first.
+- Tests sweep temp directories left by earlier runs.
+
 ## 1.1.1 (2026-11-12)
 
 Fixes from an external review of 1.1.0, plus a much larger test suite.
