@@ -33,7 +33,13 @@ The plan: keep the Markdown vault and the existing QMD search, add a Rust core (
 ## Start
 
 ```bash
-git clone https://github.com/OnurByte/smugBrain.git my-smugbrain
+curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
+```
+
+That copies the empty vault into `./smugbrain` and never overwrites anything. Read [install.sh](install.sh) first if you don't trust pipes (you shouldn't). Or by hand:
+
+```bash
+git clone https://github.com/OnurByte/smugbrain.git my-smugbrain
 cd my-smugbrain/template        # the empty vault: folders + rules
 ```
 

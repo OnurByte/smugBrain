@@ -43,8 +43,8 @@ b = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 300" width="{W}"
      + f'<svg x="100" y="60" width="190" height="152" viewBox="0 0 1060 845"><rect width="1060" height="845" fill="#fff"/><path fill="{INK}" fill-rule="evenodd" d="{ICON_PATH}"/></svg>'
      + t(330, 142, "smugBrain", 78, 700, INK, extra='letter-spacing="-3"')
      + f'<rect x="333" y="156" width="150" height="8" fill="{RED}"/>'
-     + t(330, 196, "Better than your brain. Objectively.", 19, 300)
-     + t(330, 222, "Plain files. No account. No cloud. Zero humility.", 19, 300)
+     + t(330, 196, "Your brain has been replaced.", 19, 300)
+     + t(330, 222, "Better than yours. Skill issue. No account, no cloud.", 19, 300)
      + t(100, 262, "Your agents remember. Your notes stay yours.  ·  Public domain", 12, 700)
      + t(W - 36, 262, "SBH 1.0", 12, 300, anchor="end")
      + f'<line x1="100" y1="240" x2="{W-36}" y2="240" stroke="{INK}"/></svg>\n')

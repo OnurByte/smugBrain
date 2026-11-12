@@ -33,7 +33,13 @@ Plan: Markdown vault'u ve mevcut QMD aramasını koru, Rust çekirdek (`smug` CL
 ## Başla
 
 ```bash
-git clone https://github.com/OnurByte/smugBrain.git my-smugbrain
+curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
+```
+
+Boş vault'u `./smugbrain` içine kopyalar, hiçbir şeyin üstüne yazmaz. Pipe'a güvenmiyorsan önce [install.sh](install.sh) oku (güvenmemelisin). Elle:
+
+```bash
+git clone https://github.com/OnurByte/smugbrain.git my-smugbrain
 cd my-smugbrain/template        # boş vault: klasörler + kurallar
 ```
 
