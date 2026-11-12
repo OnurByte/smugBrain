@@ -104,13 +104,19 @@ Also: `windsurf --global`, `kiro`, `vscode`, `opencode`. Zed and Cline print a s
 
 ## Numbers
 
-<p align="center"><img src="assets/card-stats.svg" alt="By the numbers" width="880"></p>
+Your agent's memory should not be a black box you rent. With smugBrain it is a folder of ordinary files that belong to you, backed by numbers you can reproduce on your own machine.
+
+<p align="center"><img src="assets/card-stats.png" alt="By the numbers" width="880"></p>
+
+**What that means for you:** you never create an account, never pay, and never lose your notes if we disappear. If a password or key ends up in a note, the backup stops before it reaches GitHub. And every number above is something you can re-run yourself.
 
 ## Compare
 
-How smugBrain compares with avenoxbeyin, obsidian-second-brain, hafiza-os, Graphiti and mem0. Facts come from each project's own repository and README, checked 2026-11-12. They lead in places and the card says where.
+Other tools remember things. smugBrain also makes sure the memory is still true, still safe and still worth trusting before your agent acts on it. Here is how it compares with avenoxbeyin, obsidian-second-brain, hafiza-os, Graphiti and mem0. Facts come from each project's own repository and README, checked 2026-11-12. They lead in places and the card says where.
 
-<p align="center"><img src="assets/card-compare.svg" alt="How smugBrain compares with avenoxbeyin, hafiza-os, Graphiti and mem0" width="880"></p>
+<p align="center"><img src="assets/card-compare.png" alt="How smugBrain compares with avenoxbeyin, hafiza-os, Graphiti and mem0" width="880"></p>
+
+**In plain words:** it installs as one file, it works offline, it will not hand your agent a decision you already replaced, and it shows you what a change will break before you make it. smugBrain is also public domain, so there is nothing to license and nothing to ask permission for.
 
 <details>
 <summary><b>What it does: the commands</b></summary>
