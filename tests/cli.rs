@@ -11,7 +11,7 @@ fn smug(vault: &Path, args: &[&str], stdin: &str) -> (i32, String, String) {
     let mut c = Command::new(env!("CARGO_BIN_EXE_smug"))
         .args(args).env("SMUG_VAULT", vault)
         .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
-    c.stdin.take().unwrap().write_all(stdin.as_bytes()).unwrap();
+    let _ = c.stdin.take().unwrap().write_all(stdin.as_bytes()); // smug may exit before reading (EPIPE is fine)
     let o = c.wait_with_output().unwrap();
     (o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).into(), String::from_utf8_lossy(&o.stderr).into())
 }
