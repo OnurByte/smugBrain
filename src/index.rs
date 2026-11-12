@@ -29,8 +29,25 @@ fn open(root: &Path) -> Res<(Index, Field, Field)> {
     Ok((idx, path, body))
 }
 
-/// Re-indexes only notes whose size/mtime changed; drops deleted ones. Returns how many changed.
+fn wipe(root: &Path, st: &State) -> Res<()> {
+    let _ = fs::remove_dir_all(root.join(".smug/tantivy"));
+    st.docs_clear()
+}
+
+/// Re-indexes only notes whose size/mtime changed and drops deleted ones. Self-healing: if the index is missing,
+/// corrupt, or disagrees with what the state says is indexed, it is wiped and rebuilt from the Markdown.
 pub fn refresh(root: &Path, st: &State) -> Res<usize> {
+    if let Ok((n, true)) = refresh_inner(root, st) {
+        return Ok(n);
+    }
+    wipe(root, st)?;
+    match refresh_inner(root, st)? {
+        (n, true) => Ok(n),
+        _ => Err("search index could not be rebuilt consistently".into()),
+    }
+}
+
+fn refresh_inner(root: &Path, st: &State) -> Res<(usize, bool)> {
     let (idx, path_f, body_f) = open(root)?;
     let known = st.docs()?;
     let pats = patterns();
@@ -42,19 +59,20 @@ pub fn refresh(root: &Path, st: &State) -> Res<usize> {
         let t = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0);
         let sig = format!("{}:{t}", m.len());
         seen.insert(r.clone());
-        if known.get(&r) == Some(&sig) {
+        if known.get(&r).and_then(|v| v.rsplit_once('|')).map(|x| x.0) == Some(sig.as_str()) {
             continue;
         }
         changed += 1;
         writer.delete_term(Term::from_field_text(path_f, &r));
         let d = fs::read(&f)?;
-        if hits(&pats, &d).is_empty() {
+        let indexed = hits(&pats, &d).is_empty(); // secret-shaped notes are never indexed
+        if indexed {
             let mut doc = TantivyDocument::default();
             doc.add_text(path_f, &r);
             doc.add_text(body_f, String::from_utf8_lossy(&d));
             writer.add_document(doc)?;
-        } // secret-shaped notes are never indexed
-        set.push((r, sig));
+        }
+        set.push((r, format!("{sig}|{}", indexed as u8)));
     }
     let gone: Vec<String> = known.keys().filter(|k| !seen.contains(*k)).cloned().collect();
     for g in &gone {
@@ -65,10 +83,24 @@ pub fn refresh(root: &Path, st: &State) -> Res<usize> {
         writer.commit()?;
         st.docs_apply(&set, &gone)?;
     }
-    Ok(changed)
+    drop(writer);
+    // consistency: what Tantivy holds must equal what the state says was indexed
+    let expected = st.docs()?.values().filter(|v| v.ends_with("|1")).count() as u64;
+    let have = idx.reader()?.searcher().num_docs();
+    Ok((changed, have == expected))
 }
 
 pub fn retrieve(root: &Path, st: &State, q: &str, k: usize) -> Res<Vec<Hit>> {
+    match retrieve_inner(root, st, q, k) {
+        Ok(h) => Ok(h),
+        Err(_) => {
+            wipe(root, st)?; // damaged segment files: rebuild once and retry
+            retrieve_inner(root, st, q, k)
+        }
+    }
+}
+
+fn retrieve_inner(root: &Path, st: &State, q: &str, k: usize) -> Res<Vec<Hit>> {
     refresh(root, st)?;
     let clean: String = q.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).collect();
     if clean.trim().is_empty() || k == 0 {

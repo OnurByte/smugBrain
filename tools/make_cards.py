@@ -52,7 +52,7 @@ save("banner.svg", b)
 
 # ---------- 1.2 stats ----------
 rows = [("100%", "of your notes are plain Markdown", 100, "Open, copy, print, or leave any time."),
-        ("223", "automated tests, all green", 0, "Linux, macOS, Windows in CI. FreeBSD and Haiku run them at release."),
+        ("250", "automated tests, all green", 0, "Linux, macOS, Windows in CI. FreeBSD and Haiku run them at release."),
         ("0", "files lost with 8 writers at once", 0, "1 write accepted, 7 refused on hash conflict. Automated test."),
         ("21 ms", "to search 2,000 notes", 0, "Tantivy index, warm. First build 139 ms. Synthetic vault."),
         ("7 MB", "one binary, nothing else to install", 0, "No Python. No Node. No C library. No server. No account.")]
@@ -62,7 +62,7 @@ for i, (big, label, pct, note) in enumerate(rows):
     body += t(100, y + 34, big, 52, 700, RED) + t(330, y + 8, label, 15, 700) + t(330, y + 28, note, 12.5, 300, GRAY)
     if pct: body += f'<rect x="330" y="{y+38}" width="500" height="6" fill="#EEE"/><rect x="330" y="{y+38}" width="{500*pct/100:.0f}" height="6" fill="{INK}"/>'
     body += f'<line x1="100" y1="{y+60}" x2="{W-36}" y2="{y+60}" stroke="#DDD"/>' if i < 4 else ""
-body += t(100, 538, "Measured 2026-11-12 with smug 1.0.0. Run them yourself: cargo test, smug bench.", 12, 300, GRAY)
+body += t(100, 538, "Measured 2026-11-12 with smug 1.0.1. Run them yourself: cargo test, smug bench.", 12, 300, GRAY)
 save("card-stats.svg", page(568, "By the numbers", "1.1", body))
 
 # ---------- 1.8 compare ----------
@@ -91,5 +91,5 @@ for i, (lab, vals) in enumerate(rows):
         body += t(x, y + 8, v, 11.5, 700 if j == 0 else 300, PAPER if j == 0 else (GRAY if v.startswith(("—",)) else INK), "middle")
 body += t(100, 716, "Checked 2026-11-12: licenses via the GitHub API, the rest from each project's README. \"—\" = not found there (may live in code or other docs).", 11, 300, GRAY)
 body += t(100, 738, "Where they lead today: community size, native agent hooks (hafiza-os: Claude Code, Codex, Antigravity), built-in semantic search,", 11, 700, INK)
-body += t(100, 754, "and test volume (hafiza-os reports 360, avenoxbeyin 2,316; smug has 223). smug --deep hands semantic queries to QMD.", 11, 700, INK)
+body += t(100, 754, "and test volume (hafiza-os reports 360, avenoxbeyin 2,316; smug has 250). smug --deep hands semantic queries to QMD.", 11, 700, INK)
 save("card-compare.svg", page(810, "How we compare", "1.2", body))

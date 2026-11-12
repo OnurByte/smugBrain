@@ -290,49 +290,118 @@ pub fn patch(root: &Path, a: &[String]) -> R {
 }
 
 fn apply_to(st: &State, p: &Value) -> Res<()> {
+    // Idempotent: every step checks whether it already happened, so an interrupted apply can simply be run again.
     let s = |k: &str| p[k].as_str().unwrap_or("").to_string();
     let (old, new_id, date) = (s("old"), s("new_id"), s("valid_from"));
     let notes = load_notes(&st.root);
     let on = notes.iter().find(|n| n.get("id") == old).ok_or("old decision vanished")?;
-    let deps = on.get("depends_on").to_string();
-    let extra = [
-        ("title", s("title")),
-        ("status", "active".into()),
-        ("topic", s("topic")),
-        ("source", s("source")),
-        ("valid_from", date.clone()),
-        ("known_at", today()),
-        ("supersedes", old.clone()),
-        ("depends_on", if deps.is_empty() { "[]".into() } else { deps }),
-    ];
     let new_rel = format!("500-knowledge/decisions/{new_id}.md");
-    write_note(st, Path::new(&new_rel), fm_note("decision", &new_id, &extra, &s("body")).as_bytes(), Some("new"))?.map_err(|e| e)?;
-    let old_path = st.root.join(&on.rel);
-    let text = fs::read_to_string(&old_path)?;
-    let t2 = set_fm(&set_fm(&set_fm(&text, "status", "superseded"), "valid_to", &date), "superseded_by", &new_id);
-    write_note(st, Path::new(&on.rel), t2.as_bytes(), Some(&sha(text.as_bytes())))?.map_err(|e| e)?;
+    match notes.iter().find(|n| n.rel == new_rel) {
+        Some(n) if n.get("supersedes") == old => {} // step 1 already done
+        Some(_) => return Err("a different note already uses that id".into()),
+        None => {
+            let deps = on.get("depends_on").to_string();
+            let extra = [
+                ("title", s("title")),
+                ("status", "active".into()),
+                ("topic", s("topic")),
+                ("source", s("source")),
+                ("valid_from", date.clone()),
+                ("known_at", today()),
+                ("supersedes", old.clone()),
+                ("depends_on", if deps.is_empty() { "[]".into() } else { deps }),
+            ];
+            write_note(st, Path::new(&new_rel), fm_note("decision", &new_id, &extra, &s("body")).as_bytes(), Some("new"))??;
+        }
+    }
+    if !(on.status() == "superseded" && on.get("superseded_by") == new_id) {
+        let text = fs::read_to_string(st.root.join(&on.rel))?;
+        let t2 = set_fm(&set_fm(&set_fm(&text, "status", "superseded"), "valid_to", &date), "superseded_by", &new_id);
+        write_note(st, Path::new(&on.rel), t2.as_bytes(), Some(&sha(text.as_bytes())))??;
+    }
     Ok(())
+}
+
+fn set_patch_status(st: &State, rel: &str, text: &str, p: &mut Value, status: &str) -> Res<String> {
+    p["status"] = json!(status);
+    if status == "applied" {
+        p["applied_at"] = json!(today());
+    }
+    let new = serde_json::to_string_pretty(p)?;
+    write_note(st, Path::new(rel), new.as_bytes(), Some(&sha(text.as_bytes())))??;
+    Ok(new)
+}
+
+/// Finishes any patch whose apply was interrupted (status "applying"). Called by `doctor`.
+pub fn resume_applying(st: &State) -> Res<usize> {
+    let Ok(rd) = fs::read_dir(st.root.join("patches")) else { return Ok(0) };
+    let mut done = 0;
+    for e in rd.flatten() {
+        let rel = format!("patches/{}", e.file_name().to_string_lossy());
+        let Ok(text) = fs::read_to_string(st.root.join(&rel)) else { continue };
+        let Ok(mut p) = serde_json::from_str::<Value>(&text) else { continue };
+        if p["status"] == "applying" {
+            apply_to(st, &p)?;
+            set_patch_status(st, &rel, &text, &mut p, "applied")?;
+            done += 1;
+        }
+    }
+    Ok(done)
 }
 
 // ---------- behavioural eval ----------
 fn cases(root: &Path) -> Res<Vec<Value>> {
     let t = fs::read_to_string(root.join("evals/cases.jsonl")).map_err(|_| "no eval cases: add evals/cases.jsonl (one JSON per line: {\"q\":..., \"expect\":[...], \"absent\":[...], \"k\":5})")?;
-    Ok(t.lines().filter(|l| !l.trim().is_empty()).filter_map(|l| serde_json::from_str(l).ok()).collect())
+    let mut v = vec![];
+    for (i, l) in t.lines().enumerate().filter(|(_, l)| !l.trim().is_empty()) {
+        v.push(serde_json::from_str(l).map_err(|e| format!("evals/cases.jsonl line {}: {e}", i + 1))?);
+    }
+    if v.is_empty() {
+        return Err("evals/cases.jsonl has no cases: an empty eval proves nothing, so smug will not treat it as a pass".into());
+    }
+    Ok(v)
 }
 
 fn strs(v: &Value) -> Vec<String> {
     v.as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
 }
 
-fn run_cases(root: &Path, st: &State, cs: &[Value]) -> Res<Vec<(bool, String)>> {
+/// Runs `cmd` through the shell with `prompt` on stdin and returns its stdout. This is how a real model joins the eval:
+/// any command that reads a prompt and prints an answer (for example `claude -p`).
+fn ask_model(cmd: &str, prompt: &str) -> Res<String> {
+    use std::{io::Write, process::{Command, Stdio}};
+    let mut c = if cfg!(windows) { Command::new("cmd") } else { Command::new("sh") };
+    c.args([if cfg!(windows) { "/C" } else { "-c" }, cmd]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit());
+    let mut ch = c.spawn()?;
+    let _ = ch.stdin.take().unwrap().write_all(prompt.as_bytes());
+    let o = ch.wait_with_output()?;
+    if !o.status.success() {
+        return Err(format!("model command failed with {}", o.status).into());
+    }
+    Ok(String::from_utf8_lossy(&o.stdout).to_string())
+}
+
+fn run_cases(root: &Path, st: &State, cs: &[Value], model: Option<&str>) -> Res<Vec<(bool, String)>> {
     cs.iter()
         .map(|c| {
             let k = c["k"].as_u64().unwrap_or(5) as usize;
-            let got: Vec<String> = search_valid(root, st, c["q"].as_str().unwrap_or(""), k, false)?.into_iter().map(|h| h.path).collect();
+            let q = c["q"].as_str().unwrap_or("");
+            let got: Vec<String> = search_valid(root, st, q, k, false)?.into_iter().map(|h| h.path).collect();
             let missing: Vec<String> = strs(&c["expect"]).into_iter().filter(|e| !got.contains(e)).collect();
             let leaked: Vec<String> = strs(&c["absent"]).into_iter().filter(|e| got.contains(e)).collect();
-            let ok = missing.is_empty() && leaked.is_empty();
-            Ok((ok, if ok { "ok".into() } else { format!("missing {missing:?} leaked {leaked:?}") }))
+            let mut detail = if missing.is_empty() && leaked.is_empty() { String::new() } else { format!("missing {missing:?} leaked {leaked:?}") };
+            let (want, forbid) = (strs(&c["answer_contains"]), strs(&c["answer_absent"]));
+            if let (Some(m), false) = (model, want.is_empty() && forbid.is_empty()) {
+                let ctx: Vec<String> = got.iter().map(|p| format!("### {p}\n{}", fs::read_to_string(root.join(p)).unwrap_or_default().chars().take(3000).collect::<String>())).collect();
+                let prompt = format!("Answer using only the notes below. If they do not contain the answer, say so.\n\n{}\n\nQuestion: {q}\n", ctx.join("\n\n"));
+                let ans = ask_model(m, &prompt)?.to_lowercase();
+                let miss: Vec<&String> = want.iter().filter(|w| !ans.contains(&w.to_lowercase())).collect();
+                let bad: Vec<&String> = forbid.iter().filter(|w| ans.contains(&w.to_lowercase())).collect();
+                if !miss.is_empty() || !bad.is_empty() {
+                    detail = format!("{detail} answer lacked {miss:?} and contained {bad:?}").trim().to_string();
+                }
+            }
+            Ok((detail.is_empty(), if detail.is_empty() { "ok".into() } else { detail }))
         })
         .collect()
 }
@@ -348,8 +417,12 @@ fn copy_md(src: &Path, dst: &Path) -> Res<()> {
 
 pub fn eval(root: &Path, a: &[String]) -> R {
     let cs = cases(root)?;
+    let model = opt(a, "--model");
+    if model.is_some() && !cs.iter().any(|c| c.get("answer_contains").is_some() || c.get("answer_absent").is_some()) {
+        eprintln!("smug: --model given but no case has answer_contains or answer_absent; only retrieval is checked");
+    }
     let st = State::open(root)?;
-    let before = run_cases(root, &st, &cs)?;
+    let before = run_cases(root, &st, &cs, model.as_deref())?;
     let after = if let Some(n) = a.first().filter(|x| !x.starts_with("--")) {
         let p: Value = serde_json::from_str(&fs::read_to_string(root.join(patch_rel(n)?))?)?;
         let sim = root.join(".smug/sim");
@@ -358,7 +431,7 @@ pub fn eval(root: &Path, a: &[String]) -> R {
         let r = (|| -> Res<Vec<(bool, String)>> {
             let sst = State::open(&sim)?;
             apply_to(&sst, &p)?;
-            run_cases(&sim, &sst, &cs)
+            run_cases(&sim, &sst, &cs, model.as_deref())
         })();
         let _ = fs::remove_dir_all(&sim);
         Some(r?)
@@ -383,24 +456,31 @@ pub fn eval(root: &Path, a: &[String]) -> R {
 }
 
 pub fn apply(root: &Path, a: &[String]) -> R {
-    let n = a.first().ok_or("usage: smug apply <patch-number> [--force]")?;
+    let n = a.first().ok_or("usage: smug apply <patch-number> [--force] [--model <cmd>]")?;
     let force = a.iter().any(|x| x == "--force");
-    let code = if force && cases(root).is_err() { 0 } else { eval(root, &[n.clone()])? };
-    if code != 0 && !force {
-        eprintln!("smug: eval regressed, refusing to apply (use --force to override)");
-        return Ok(1);
+    let rel = patch_rel(n)?;
+    let text = fs::read_to_string(root.join(&rel)).map_err(|_| "no such patch")?;
+    let mut p: Value = serde_json::from_str(&text)?;
+    let resuming = p["status"] == "applying"; // the eval gate already passed before the interruption
+    if !resuming {
+        let mut ea = vec![n.clone()];
+        ea.extend(opt(a, "--model").map(|m| vec!["--model".to_string(), m]).unwrap_or_default());
+        let code = if force && cases(root).is_err() { 0 } else { eval(root, &ea)? };
+        if code != 0 && !force {
+            eprintln!("smug: eval failed or regressed, refusing to apply (use --force to override)");
+            return Ok(1);
+        }
     }
     let st = State::open(root)?;
-    let rel = patch_rel(n)?;
-    let text = fs::read_to_string(root.join(&rel))?;
-    let mut p: Value = serde_json::from_str(&text)?;
-    if p["status"] != "proposed" {
-        return Err("patch is not in 'proposed' state".into());
+    let mut text = fs::read_to_string(root.join(&rel))?;
+    p = serde_json::from_str(&text)?;
+    match p["status"].as_str() {
+        Some("proposed") => text = set_patch_status(&st, &rel, &text, &mut p, "applying")?, // journalled before any note changes
+        Some("applying") => {}
+        _ => return Err("patch is not in 'proposed' state".into()),
     }
     apply_to(&st, &p)?;
-    p["status"] = json!("applied");
-    p["applied_at"] = json!(today());
-    write_note(&st, Path::new(&rel), serde_json::to_string_pretty(&p)?.as_bytes(), Some(&sha(text.as_bytes())))??;
+    set_patch_status(&st, &rel, &text, &mut p, "applied")?;
     println!("applied patch {n}: {} superseded by {}", p["old"].as_str().unwrap_or(""), p["new_id"].as_str().unwrap_or(""));
     Ok(0)
 }

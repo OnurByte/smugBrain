@@ -172,6 +172,10 @@ pub fn doctor(root: &Path) -> R {
         st.append(if done { "recovered" } else { "abort" }, &e.path, &e.hash, Some(e.id))?;
     }
     check(true, &format!("journal ok, {} unfinished write(s) reconciled", dangling.len()));
+    let resumed = mem::resume_applying(&st)?;
+    check(true, &format!("{resumed} interrupted patch apply(s) completed"));
+    let idx_ok = index::refresh(root, &st).is_ok();
+    check(idx_ok, "search index consistent (rebuilt from Markdown if it was not)");
     let pats = patterns();
     let leaks = candidates(root).iter().filter(|f| fs::read(f).map(|d| !hits(&pats, &d).is_empty()).unwrap_or(false)).count();
     check(leaks == 0, &format!("{leaks} secret-shaped file(s) would be committed"));
@@ -189,13 +193,13 @@ pub fn setup(root: &Path, a: &[String]) -> R {
     match a.first().map(String::as_str) {
         Some("claude") => {
             let p = root.join(".claude/settings.json");
-            let json = r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"smug context"}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"smug hook prompt"}]}]}}"#;
+            let json = r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"smug context"}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"smug hook prompt"}]}],"Stop":[{"hooks":[{"type":"command","command":"smug hook stop"}]}]}}"#;
             if p.exists() {
                 println!("{} exists. Merge this by hand:\n{json}", p.display());
             } else {
                 fs::create_dir_all(p.parent().unwrap())?;
                 fs::write(&p, json)?;
-                println!("wrote {}: sessions start with your memory, and every prompt gets note candidates and failure warnings.", p.display());
+                println!("wrote {}: sessions start with your memory, every prompt gets note candidates and failure warnings, and notes your agent actually used are credited when it stops.", p.display());
             }
             Ok(0)
         }
@@ -217,27 +221,69 @@ pub fn setup(root: &Path, a: &[String]) -> R {
     }
 }
 
-/// `smug hook prompt`: reads {"prompt": "..."} on stdin (Claude Code UserPromptSubmit). Silent unless useful. Never fails.
-pub fn hook(root: &Path, a: &[String]) -> R {
-    if a.first().map(String::as_str) != Some("prompt") {
-        return Err("usage: smug hook prompt".into());
+fn flatten(v: &serde_json::Value, out: &mut String) {
+    match v {
+        serde_json::Value::String(s) => {
+            out.push_str(s);
+            out.push('\n');
+        }
+        serde_json::Value::Array(a) => a.iter().for_each(|x| flatten(x, out)),
+        serde_json::Value::Object(o) => o.values().for_each(|x| flatten(x, out)),
+        _ => {}
     }
+}
+
+/// `smug hook prompt` (Claude Code UserPromptSubmit) and `smug hook stop` (Stop). Silent unless useful. Never fails.
+/// `prompt` remembers which notes it surfaced; `stop` reads the transcript and credits the ones the assistant actually used.
+pub fn hook(root: &Path, a: &[String]) -> R {
     let mut s = String::new();
     let _ = std::io::stdin().read_to_string(&mut s);
-    let prompt = serde_json::from_str::<serde_json::Value>(&s).ok().and_then(|v| v["prompt"].as_str().map(String::from)).unwrap_or_default();
-    if prompt.trim().is_empty() {
-        return Ok(0);
-    }
-    for w in mem::warn_texts(&mem::load_notes(root), &prompt) {
-        println!("{w}");
-    }
-    if let Ok(st) = State::open(root) {
-        if let Ok(h) = mem::search_valid(root, &st, &prompt, 3, false) {
-            if !h.is_empty() {
-                println!("smug: note candidates (open before relying on them):");
-                h.iter().for_each(|x| println!("- {}", x.path));
+    let input: serde_json::Value = serde_json::from_str(&s).unwrap_or_default();
+    match a.first().map(String::as_str) {
+        Some("prompt") => {
+            let prompt = input["prompt"].as_str().unwrap_or("").to_string();
+            if prompt.trim().is_empty() {
+                return Ok(0);
             }
+            for w in mem::warn_texts(&mem::load_notes(root), &prompt) {
+                println!("{w}");
+            }
+            if let Ok(st) = State::open(root) {
+                if let Ok(h) = mem::search_valid(root, &st, &prompt, 3, false) {
+                    let _ = fs::write(root.join(".smug/surfaced"), h.iter().map(|x| x.path.as_str()).collect::<Vec<_>>().join("\n"));
+                    if !h.is_empty() {
+                        println!("smug: note candidates (open before relying on them):");
+                        h.iter().for_each(|x| println!("- {}", x.path));
+                    }
+                }
+            }
+            Ok(0)
         }
+        Some("stop") => {
+            let surfaced = fs::read_to_string(root.join(".smug/surfaced")).unwrap_or_default();
+            let Some(tp) = input["transcript_path"].as_str() else { return Ok(0) };
+            let Ok(tr) = fs::read_to_string(tp) else { return Ok(0) };
+            // only what the assistant wrote or did; the hook's own injected candidate list is not evidence
+            let mut said = String::new();
+            for l in tr.lines().rev().take(400) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(l) {
+                    if v["type"] == "assistant" || v["message"]["role"] == "assistant" {
+                        flatten(&v["message"], &mut said);
+                    }
+                }
+            }
+            if let Ok(st) = State::open(root) {
+                for p in surfaced.lines().filter(|p| !p.is_empty()) {
+                    let base = Path::new(p).file_name().map(|b| b.to_string_lossy().to_string()).unwrap_or_default();
+                    if !base.is_empty() && said.contains(&base) {
+                        let _ = st.append("feedback", p, "used", None);
+                        let _ = st.add_feedback(p, 1);
+                    }
+                }
+            }
+            let _ = fs::remove_file(root.join(".smug/surfaced"));
+            Ok(0)
+        }
+        _ => Err("usage: smug hook prompt|stop".into()),
     }
-    Ok(0)
 }

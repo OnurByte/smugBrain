@@ -369,29 +369,36 @@ t!(patch_numbers_increase, {
     assert!(v.join("patches/001.json").exists() && v.join("patches/002.json").exists());
 });
 t!(eval_without_cases_errors, assert_eq!(smug(&vault("enc"), &["eval"], "").0, 1));
-t!(eval_with_empty_cases_passes, {
+t!(eval_with_empty_cases_is_refused, {
     let v = vault("eempty");
-    fs::write(v.join("evals/cases.jsonl"), "").unwrap();
-    assert_eq!(smug(&v, &["eval"], "").0, 0);
+    fs::write(v.join("evals/cases.jsonl"), "\n\n").unwrap();
+    let (c, _, e) = smug(&v, &["eval"], "");
+    assert!(c == 1 && e.contains("empty eval proves nothing"), "{e}");
+});
+t!(eval_malformed_line_names_the_line, {
+    let v = vault("ebad");
+    fs::write(v.join("evals/cases.jsonl"), "{\"q\":\"ok\"}\n{not json}\n").unwrap();
+    let (c, _, e) = smug(&v, &["eval"], "");
+    assert!(c == 1 && e.contains("line 2"), "{e}");
 });
 t!(eval_leaves_no_simulation_behind, {
     let v = vault("esim");
     smug(&v, &["decide", "a", "--source", "s"], "x");
-    fs::write(v.join("evals/cases.jsonl"), "").unwrap();
+    fs::write(v.join("evals/cases.jsonl"), "{\"q\":\"alpha\"}\n").unwrap();
     smug(&v, &["patch", "a", "--new-id", "b", "--source", "s2"], "y");
     smug(&v, &["eval", "1"], "");
     assert!(!v.join(".smug/sim").exists());
 });
 t!(apply_unknown_patch_errors, {
     let v = vault("aunk");
-    fs::write(v.join("evals/cases.jsonl"), "").unwrap();
+    fs::write(v.join("evals/cases.jsonl"), "{\"q\":\"x\"}\n").unwrap();
     assert_eq!(smug(&v, &["apply", "7"], "").0, 1);
 });
 t!(apply_bad_number_errors, assert_eq!(smug(&vault("abad"), &["apply", "x"], "").0, 1));
 t!(apply_marks_patch_applied, {
     let v = vault("amark");
     smug(&v, &["decide", "a", "--source", "s"], "alpha");
-    fs::write(v.join("evals/cases.jsonl"), "").unwrap();
+    fs::write(v.join("evals/cases.jsonl"), "{\"q\":\"alpha\"}\n").unwrap();
     smug(&v, &["patch", "a", "--new-id", "b", "--source", "s2"], "beta");
     assert_eq!(smug(&v, &["apply", "1"], "").0, 0);
     assert!(fs::read_to_string(v.join("patches/001.json")).unwrap().contains("\"applied\""));
@@ -410,7 +417,7 @@ t!(apply_force_without_cases, {
 t!(superseded_decision_is_flagged_stale, {
     let v = vault("astale");
     smug(&v, &["decide", "a", "--source", "s"], "alpha");
-    fs::write(v.join("evals/cases.jsonl"), "").unwrap();
+    fs::write(v.join("evals/cases.jsonl"), "{\"q\":\"alpha\"}\n").unwrap();
     smug(&v, &["patch", "a", "--new-id", "b", "--source", "s2"], "beta");
     smug(&v, &["apply", "1"], "");
     assert!(smug(&v, &["check", "a"], "").1.contains("STALE"));
@@ -460,7 +467,7 @@ t!(setup_claude_writes_both_hooks, {
     let v = vault("sc");
     assert_eq!(smug(&v, &["setup", "claude"], "").0, 0);
     let j: serde_json::Value = serde_json::from_str(&fs::read_to_string(v.join(".claude/settings.json")).unwrap()).unwrap();
-    assert!(j["hooks"]["SessionStart"].is_array() && j["hooks"]["UserPromptSubmit"].is_array());
+    assert!(j["hooks"]["SessionStart"].is_array() && j["hooks"]["UserPromptSubmit"].is_array() && j["hooks"]["Stop"].is_array());
 });
 t!(setup_claude_never_overwrites, {
     let v = vault("scow");

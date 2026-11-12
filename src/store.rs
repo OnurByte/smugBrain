@@ -126,6 +126,14 @@ impl State {
         Ok(())
     }
 
+    pub fn docs_clear(&self) -> Res<()> {
+        let w = self.db.begin_write()?;
+        w.delete_table(DOCS)?;
+        w.open_table(DOCS)?;
+        w.commit()?;
+        Ok(())
+    }
+
     pub fn feedback(&self) -> Res<HashMap<String, i64>> {
         let r = self.db.begin_read()?;
         let t = r.open_table(FEEDBACK)?;

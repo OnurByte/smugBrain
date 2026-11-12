@@ -7,7 +7,7 @@ Thanks for helping. Bug reports, test cases, new platform checks and docs fixes 
 ## Build and test
 
 ```bash
-cargo test --release          # 223 tests; they spawn the real binary against temp vaults
+cargo test --release          # 250 tests; they spawn the real binary against temp vaults
 python3 tools/make_cards.py   # regenerate the README cards
 ```
 

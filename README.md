@@ -3,7 +3,7 @@
 <p align="center">
 <a href="https://github.com/OnurByte/smugbrain/releases/latest"><img src="https://img.shields.io/github/v/release/OnurByte/smugbrain?color=D92B2F" alt="Release"></a>
 <a href="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml"><img src="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<img src="https://img.shields.io/badge/tests-223-brightgreen" alt="223 tests">
+<img src="https://img.shields.io/badge/tests-250-brightgreen" alt="250 tests">
 <img src="https://img.shields.io/badge/Rust-000?logo=rust&logoColor=white" alt="Rust">
 <img src="https://img.shields.io/badge/license-public%20domain-D92B2F" alt="Public domain">
 <img src="https://img.shields.io/badge/macOS-000?logo=apple&logoColor=white" alt="macOS">
@@ -93,6 +93,10 @@ How smugBrain compares with avenoxbeyin, obsidian-second-brain, hafiza-os, Graph
 
 **How is it different from Mem0, Graphiti or a vector database?** Those store memories in a database or service. smugBrain keeps Markdown as the only source of truth, so you can read, diff and back up your memory with git, and its index is disposable.
 
+**Can it test what a model would answer?** Yes, with your own model command: add `answer_contains` / `answer_absent` to eval cases and run `smug eval 1 --model "claude -p"`. The patch is applied only if answers do not regress.
+
+**What if smug crashes halfway through a change?** Every step is journalled and idempotent. `smug doctor` (or re-running `smug apply`) finishes an interrupted apply; a damaged search index is rebuilt from the Markdown automatically.
+
 **Is it safe to back up?** `smug backup` scans exactly what is staged and stops on private keys, tokens, API keys, `password:` lines and recovery phrases. Anything secret-shaped belongs in `.secrets/`, which is never committed or indexed.
 
 **Is it really a single binary?** Yes: about 7 MB, pure Rust (redb for state, Tantivy for search), no Python, no Node, no C library, no server.
@@ -105,10 +109,10 @@ Markdown notes. State in [redb](https://github.com/cberner/redb), search in [Tan
 
 ## Limits
 
-- `eval` measures what retrieval returns for your questions, not what a model answers.
+- Models join the eval only through a command you supply (`smug eval 1 --model "claude -p"`); smug bundles no model.
 - `bench` runs on your own cases; there is no independent public benchmark.
 - Codex and Hermes have no native lifecycle hooks in smug.
-- `smug feedback` is recorded by you or your agent, not inferred.
+- Automatic feedback (Stop hook) is a heuristic: a surfaced note counts as used when its file name appears in what the assistant wrote or did.
 
 ## Contributing
 
