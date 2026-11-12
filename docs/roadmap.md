@@ -1,6 +1,6 @@
 # Roadmap
 
-Source: the author's own comparison of Imperium 2.0 (the Python reference vault) against another open-source memory system, 2026-11. No independent benchmark of the two exists yet; claims below are plans, not results.
+Source: the author's own comparison of the author's prototype vault against another open-source memory system, 2026-11. No independent benchmark of the two exists yet; claims below are plans, not results.
 
 ## Principle
 
@@ -29,10 +29,10 @@ Not in v1: separate graph DB, always-on daemon, mandatory cloud, new GUI, autono
 | 03 | Retrieval V3 | L0 exact id/alias/file → L1 FTS5 + Turkish normalisation → L2 QMD hybrid. Superseded facts filtered after retrieval, not just down-weighted |
 | 04 | Decisions | Facts have validity, decisions have reasons. Edges go candidate → verified → active → superseded |
 | 05 | Ideas + capture | Small adapters: URL, repo, page text, file, transcript. Fetching and synthesising are separate steps |
-| 06 | Migrate | Rust runs read-only in shadow mode beside Python, diffs reported, then writes move over; Python retired only after rollback is proven |
+| 06 | Migrate | Rust runs read-only in shadow mode beside the prototype, diffs reported, then writes move over; prototype retired only after rollback is proven |
 
 ## Benchmark contract
 
 Recall@5, MRR, nDCG@5 · false-positive and abstention rate · stale-claim suppression · secret canary, path escape, unauthorised write · crash, concurrency, idempotency, restore · p50/p95 latency, RAM, CPU, context size · cold-session and compaction handoff.
 
-Acceptance gates: zero data loss, zero secret leakage, correct source references, no retrieval regression versus 2.0. Goal: p95 < 250 ms for warm keyword queries on small and medium vaults (a target, not a measurement). The model-backed search never runs on every prompt.
+Acceptance gates: zero data loss, zero secret leakage, correct source references, no retrieval regression versus the prototype. Goal: p95 < 250 ms for warm keyword queries on small and medium vaults (a target, not a measurement). The model-backed search never runs on every prompt.

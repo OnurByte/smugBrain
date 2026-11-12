@@ -45,7 +45,7 @@ b = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 300" width="{W}"
      + f'<rect x="333" y="156" width="150" height="8" fill="{RED}"/>'
      + t(330, 196, "Your brain has been replaced.", 19, 300)
      + t(330, 222, "Better than yours. Skill issue. No account, no cloud.", 19, 300)
-     + t(100, 262, "Your agents remember. Your notes stay yours.  ·  Public domain", 12, 700)
+     + t(100, 262, "Rust core  ·  Plain Markdown  ·  Public domain", 12, 700)
      + t(W - 36, 262, "SBH 1.0", 12, 300, anchor="end")
      + f'<line x1="100" y1="240" x2="{W-36}" y2="240" stroke="{INK}"/></svg>\n')
 save("banner.svg", b)
@@ -65,7 +65,7 @@ save("card-what.svg", page(390, "What is it", "1.1", body))
 
 # ---------- 1.2 stats ----------
 rows = [("100%", "of your notes are plain Markdown", 100, "Open, copy, print, or leave any time."),
-        ("5/5", "built-in self-tests pass", 100, "Run  python3 .claude/scripts/selftest.py  on the reference vault."),
+        ("5/5", "built-in self-tests pass", 100, "Run on the reference vault."),
         ("5", "secret scanners run before every backup", 100, "Private keys, tokens, API keys, passwords, recovery phrases."),
         ("0", "accounts or subscriptions needed", 0, "Nothing to sign up for. Nothing to cancel.")]
 body = ""
@@ -108,7 +108,7 @@ body = (box(100, 120, 170, 70, "Your agents", "Claude · Codex · Hermes")
 save("card-how.svg", page(430, "How it fits together", "1.4", body))
 
 # ---------- 1.5 roadmap ----------
-ph = [("Baseline", "Python Imperium 2.0 · running today", 100),
+ph = [("Baseline", "Prototype · running today", 100),
       ("01", "Measure: benchmark and safety tests", 0),
       ("02", "Rust core: one binary, crash-safe edits", 0),
       ("03", "Retrieval V3: three-level search", 0),
@@ -130,6 +130,61 @@ body = (t(100, 150, "Public domain.", 52, 700, RED)
         + f'<line x1="100" y1="212" x2="{W-36}" y2="212" stroke="{INK}"/>'
         + t(100, 244, "Unlicense", 14, 700) + t(290, 244, "No attribution, no permission, no tracking.", 14, 300)
         + t(100, 272, "Warranty", 14, 700) + t(290, 272, "None. You own the risk, like you own the keys.", 14, 300)
-        + t(100, 300, "Read", 14, 700) + t(290, 300, "LICENSE · CRYPTO-ANARCHY.md", 14, 300))
+        + t(100, 300, "Read", 14, 700) + t(290, 300, "LICENSE", 14, 300))
 save("card-license.svg", page(340, "License", "1.6", body))
 print("ok", sorted(p.name for p in A.glob("*.svg")))
+
+
+# ---------- 1.7 install ----------
+def icon(kind, x, y):
+    g = f'<g transform="translate({x},{y})">'
+    if kind == "mac":
+        g += f'<rect width="64" height="64" rx="14" fill="{INK}"/><circle cx="22" cy="26" r="4" fill="#fff"/><circle cx="42" cy="26" r="4" fill="#fff"/><path d="M18 42Q32 54 46 42" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>'
+    elif kind == "linux":
+        g += f'<ellipse cx="32" cy="36" rx="20" ry="26" fill="{INK}"/><circle cx="32" cy="14" r="11" fill="{INK}"/><ellipse cx="32" cy="42" rx="12" ry="17" fill="#fff"/><circle cx="27" cy="12" r="2.5" fill="#fff"/><circle cx="37" cy="12" r="2.5" fill="#fff"/><path d="M27 19L37 19L32 25Z" fill="{RED}"/><ellipse cx="20" cy="62" rx="9" ry="3.5" fill="{RED}"/><ellipse cx="44" cy="62" rx="9" ry="3.5" fill="{RED}"/>'
+    elif kind == "bsd":
+        g += f'<circle cx="32" cy="38" r="24" fill="{RED}"/><path d="M12 22L18 4L30 16ZM52 22L46 4L34 16Z" fill="{RED}"/><circle cx="23" cy="36" r="4" fill="#fff"/><circle cx="41" cy="36" r="4" fill="#fff"/><path d="M22 48Q32 56 42 48" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+    elif kind == "haiku":
+        g += f'<rect width="64" height="64" rx="32" fill="{INK}"/><path d="M20 16V48M44 16V48M20 32H44" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="50" cy="14" r="5" fill="{RED}"/>'
+    else:
+        g += "".join(f'<rect x="{a}" y="{b}" width="29" height="29" fill="{INK}"/>' for a in (2, 33) for b in (2, 33))
+    return g + "</g>"
+
+oss = [("macOS", "mac"), ("Linux", "linux"), ("FreeBSD", "bsd"), ("Haiku", "haiku"), ("Windows", "win")]
+body = t(100, 118, "Pick your system. Paste one line. Done.", 13, 700)
+for i, (n, k) in enumerate(oss):
+    x = 100 + i * 148
+    body += icon(k, x, 140) + t(x, 228, n, 15, 700)
+body += f'<rect x="100" y="262" width="680" height="96" fill="none" stroke="{INK}"/>'
+body += t(116, 288, "macOS · Linux · FreeBSD · Haiku", 13, 700, RED)
+body += t(116, 316, "curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh", 12.5, 400, extra='font-family="Menlo, Consolas, monospace"')
+body += t(116, 340, "Needs only sh, curl and tar. Untested on Haiku and FreeBSD.", 12, 300, GRAY)
+body += f'<rect x="100" y="376" width="680" height="96" fill="none" stroke="{INK}"/>'
+body += t(116, 402, "Windows (PowerShell)", 13, 700, RED)
+body += t(116, 430, "irm https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.ps1 | iex", 12.5, 400, extra='font-family="Menlo, Consolas, monospace"')
+body += t(116, 454, "Or run the Linux line inside WSL or Git Bash.", 12, 300, GRAY)
+save("card-install.svg", page(500, "Install", "1.7", body))
+
+# ---------- 1.8 compare ----------
+cols = ["smugBrain", "avenoxbeyin", "obsidian-second-brain", "Graphiti", "mem0"]
+rows = [("Notes are plain Markdown files", ["Yes", "Yes", "Yes", "No: graph DB", "No: vector DB"]),
+        ("License", ["Public domain", "MIT", "MIT", "Apache-2.0", "Apache-2.0"]),
+        ("Needs a database or account", ["No", "No", "No", "Graph DB", "Sign-up or DB"]),
+        ("Secret scan before every backup", ["5, always on", "opt-in", "—", "—", "—"]),
+        ]
+x0, cw = 330, 104
+body = ""
+for j, c in enumerate(cols):
+    x = x0 + j * cw
+    if j == 0:
+        body += f'<rect x="{x-4}" y="100" width="{cw}" height="{70+len(rows)*54}" fill="{RED}"/>'
+    body += t(x + cw / 2 - 8, 148, c if len(c) < 12 else "obsidian-2nd", 11.5, 700, PAPER if j == 0 else INK, "middle")
+for i, (lab, vals) in enumerate(rows):
+    y = 186 + i * 54
+    body += f'<line x1="100" y1="{y-18}" x2="{W-36}" y2="{y-18}" stroke="#DDD"/>' + t(100, y + 8, lab, 13, 700)
+    for j, v in enumerate(vals):
+        x = x0 + j * cw + cw / 2 - 8
+        body += t(x, y + 8, v, 11.5, 700 if j == 0 else 300, PAPER if j == 0 else (GRAY if v.startswith(("—",)) else INK), "middle")
+body += t(100, 424, "Checked 2026-11-12: licenses via the GitHub API, the rest from each project's README. \"—\" = not found there.", 11, 300, GRAY)
+body += t(100, 442, "Where they beat us today: community size, number of supported agents, mature runtime. See the roadmap.", 11, 700, INK)
+save("card-compare.svg", page(470, "How we compare", "1.8", body))

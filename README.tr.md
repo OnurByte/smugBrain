@@ -1,52 +1,33 @@
 <p align="center"><img src="assets/banner.svg" alt="smugBrain" width="880"></p>
+<p align="center"><a href="README.md">English</a> · <a href="LICENSE">Kamu malı</a></p>
 
-<p align="center"><a href="README.md">English</a> · <a href="LICENSE">Kamu malı</a> · <a href="CRYPTO-ANARCHY.md">Kripto-anarşi bildirisi</a></p>
-
-**smugBrain**, açıkçası seninkinden daha iyi bir ikinci beyin: yapay zekâ ajanlarıyla çalışan ve hafızasını bir şirketten kiralamak istemeyen insanlar için ikinci beyindir. Markdown notlardan oluşan bir klasör ve küçük bir araç seti: Claude Code, Codex ve Hermes dünü hatırlar, doğru notu bulur, yedek alırken gizli bilgi sızdırmaz.
-
-Metin editörü kullanabiliyorsan bunu da kullanabilirsin.
+**smugBrain**, açıkçası seninkinden daha iyi bir ikinci beyin. Düz Markdown notlar, Rust çekirdek (yapım aşamasında) ve dünü hatırlayan ajanlar (Claude Code, Codex, Hermes). Hesap yok. Bulut yok.
 
 <p align="center"><img src="assets/card-what.svg" alt="Nedir" width="880"></p>
 
-## Neden
+## Kurulum
 
-Çoğu "yapay zekâ hafızası" ürünü notlarını başkasının sunucusunda tutar, şirket fikrini değiştirince bozulur. smugBrain tek bir gerçek kaynak tutar: senin klasörün. Bütün indeksler silinip yeniden kurulabilir.
+<p align="center"><img src="assets/card-install.svg" alt="Kurulum" width="880"></p>
 
-<p align="center"><img src="assets/card-how.svg" alt="Nasıl çalışır" width="880"></p>
+## Karşılaştırma
+
+<p align="center"><img src="assets/card-compare.svg" alt="Karşılaştırma" width="880"></p>
 
 ## Sayılar
 
-Yazarın referans vault'unda 2026-11-12'de ölçülen gerçek sayılar. Yuvarlanıp güzelleştirilmedi.
-
-<p align="center"><img src="assets/card-stats.svg" alt="Sayılarla" width="880"></p>
-
-Sıradaki hedefler. Bunlar **hedef**, sonuç değil:
-
+<p align="center"><img src="assets/card-stats.svg" alt="Sayılar" width="880"></p>
 <p align="center"><img src="assets/card-targets.svg" alt="Hedefler" width="880"></p>
+
+## Nasıl çalışır
+
+<p align="center"><img src="assets/card-how.svg" alt="Nasıl çalışır" width="880"></p>
 
 ## Yol haritası
 
 <p align="center"><img src="assets/card-roadmap.svg" alt="Yol haritası" width="880"></p>
 
-Plan: Markdown vault'u ve mevcut QMD aramasını koru, Rust çekirdek (`smug` CLI, geçmiş ve indeks için SQLite) ekle, "daha iyi" demeden önce her adımı benchmark ile kanıtla. Ayrıntı: [docs/roadmap.md](docs/roadmap.md).
-
-## Başla
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
-```
-
-Boş vault'u `./smugbrain` içine kopyalar, hiçbir şeyin üstüne yazmaz. Pipe'a güvenmiyorsan önce [install.sh](install.sh) oku (güvenmemelisin). Elle:
-
-```bash
-git clone https://github.com/OnurByte/smugbrain.git my-smugbrain
-cd my-smugbrain/template        # boş vault: klasörler + kurallar
-```
-
-`template/` klasörünü Obsidian'da aç. Ajanının uyduğu kurallar `template/CLAUDE.md` içinde. Otomasyon script'leri public olmadan önce temizleniyor, şimdilik kurulum bu kadar.
+Ayrıntı: [docs/roadmap.md](docs/roadmap.md)
 
 ## Lisans
 
 <p align="center"><img src="assets/card-license.svg" alt="Lisans" width="880"></p>
-
-Tasarım dili: NASA Graphics Standards Manual NHB 1430.2 (1976). Kartları yeniden üretmek için: `python3 tools/make_cards.py`.
