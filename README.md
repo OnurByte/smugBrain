@@ -1,20 +1,24 @@
 <p align="center"><img src="assets/banner.svg" alt="smugBrain" width="880"></p>
 
 <p align="center">
+<a href="https://github.com/OnurByte/smugbrain/releases/latest"><img src="https://img.shields.io/github/v/release/OnurByte/smugbrain?color=D92B2F" alt="Release"></a>
+<a href="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml"><img src="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <img src="https://img.shields.io/badge/Rust-000?logo=rust&logoColor=white" alt="Rust">
 <img src="https://img.shields.io/badge/license-public%20domain-D92B2F" alt="Public domain">
 <img src="https://img.shields.io/badge/macOS-000?logo=apple&logoColor=white" alt="macOS">
 <img src="https://img.shields.io/badge/Linux-000?logo=linux&logoColor=white" alt="Linux">
-<img src="https://img.shields.io/badge/FreeBSD-AB2B28?logo=freebsd&logoColor=white" alt="FreeBSD">
 <img src="https://img.shields.io/badge/Windows-0078D6" alt="Windows">
+<img src="https://img.shields.io/badge/FreeBSD-AB2B28?logo=freebsd&logoColor=white" alt="FreeBSD">
 <img src="https://img.shields.io/badge/Haiku-F58220" alt="Haiku">
 </p>
 
-**smugBrain** is a brain upgrade that is, frankly, better than yours. Plain Markdown notes plus one small Rust binary (`smug`) that lets your agents (Claude Code, Codex, Hermes) remember what you did yesterday. No account. No cloud.
+**smugBrain** is a brain upgrade that is, frankly, better than yours. Plain Markdown notes plus one small binary (`smug`) that lets your agents (Claude Code, Codex, Hermes) remember what you did yesterday and never overwrite your notes by accident. No account. No cloud. Nothing to compile.
 
 ## Install
 
-Empty vault, no Rust needed. macOS, Linux, FreeBSD, Haiku (needs `sh`, `curl`, `tar`):
+Grab a prebuilt binary from the **[Releases page](https://github.com/OnurByte/smugbrain/releases/latest)**, or paste one line. The installer checks the SHA-256 before it installs anything.
+
+macOS and Linux (x86-64, ARM):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
@@ -26,26 +30,32 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.ps1 | iex
 ```
 
-The `smug` command (any system with Rust and a C compiler):
+FreeBSD and Haiku have no prebuilt binary yet. With Rust installed:
 
 ```bash
 cargo install --git https://github.com/OnurByte/smugbrain
 ```
 
-Only tested on Linux so far. Windows, FreeBSD, Haiku and macOS: should work, unverified.
+Then:
+
+```bash
+smug init my-brain        # new vault: folders, rules, .gitignore
+cd my-brain
+smug setup claude         # Claude Code starts every session with your memory
+```
 
 ## Use
 
 ```bash
-smug init my-brain        # new vault
-smug search rust karar    # find notes
-smug context              # what an agent should read first (pipe it into a session-start hook)
-smug write note.md --expect new < text   # atomic write; refuses if the file changed under you
-smug scan                 # secret guard
-smug backup               # scan, commit, push; stops if anything looks like a secret
-smug doctor               # health check + crash recovery
-smug log                  # write history
+smug search rust karar                       # find notes (persistent index, ~12 ms)
+smug context                                 # what an agent should read first
+smug write note.md --expect new < text       # atomic write; --expect <sha256> refuses if the file changed
+smug backup                                  # scan staged files, commit, push; stops on any secret
+smug doctor                                  # health check + crash recovery
+smug log                                     # write history
 ```
+
+`write` has no blind mode unless you pass `--force`. It refuses paths outside the vault, symlinks anywhere on the path, and content that looks like a key or recovery phrase.
 
 ## Numbers
 
@@ -55,26 +65,20 @@ smug log                  # write history
 
 <p align="center"><img src="assets/card-compare.svg" alt="How we compare" width="880"></p>
 
-## Roadmap
+## Status
 
-| Step | Status |
+| Done in v0.2 | Not done |
 | --- | --- |
-| Rust core: init, search, context, write, log, scan, backup, doctor | done, v0.1 |
-| Semantic search (QMD) behind keyword search | 0% |
-| Facts with validity, decisions with reasons | 0% |
-| Capture adapters: URL, repo, file, video | 0% |
-| Benchmark against others, 100+ queries | 0% |
+| Hash-checked writes, required by default | Memory Patch / impact / eval commands |
+| OS-level lock (cannot go stale) | Source, claim and decision data model |
+| Symlink-safe, path-escape-safe writes | Semantic search (QMD) behind keyword search |
+| Persistent search index | Write history stored in git (it lives in `.smug/` for now) |
+| Backup scans exactly what is staged | Real Codex and Hermes hooks (Codex reads `AGENTS.md`) |
+| Claude Code session-start hook | Prebuilt FreeBSD and Haiku binaries |
+| Tested on Linux, macOS, Windows in CI | Independent benchmark |
 
-Plan and acceptance gates: [docs/roadmap.md](docs/roadmap.md).
-
-## Tests
-
-```bash
-cargo test --release     # path-escape and secret-pattern tests
-```
-
-The numbers card was measured by hand: 8 parallel `smug write --expect <hash>` calls on one note (1 accepted, 7 refused), and `smug search` on 2,000 generated notes.
+Plan: [docs/roadmap.md](docs/roadmap.md).
 
 ## License
 
-Public domain ([Unlicense](LICENSE)). Do whatever. Design: NASA Graphics Standards Manual NHB 1430.2 (1976).
+Public domain ([Unlicense](LICENSE)). Design: NASA Graphics Standards Manual NHB 1430.2 (1976).

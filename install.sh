@@ -1,11 +1,36 @@
 #!/bin/sh
-# smugBrain installer: copies the empty vault into ./smugbrain (or $1). Never overwrites.
+# smugBrain installer: downloads the prebuilt `smug` binary from GitHub Releases, verifies its SHA-256, installs it.
+# No Rust, no compiler. Never touches your notes.
+#   SMUG_VERSION=v0.2.0   pick a release (default: latest)
+#   SMUG_BIN=~/bin        install directory (default: ~/.local/bin)
 set -eu
-DEST="${1:-smugbrain}"
-URL="${SMUG_TARBALL:-https://github.com/OnurByte/smugbrain/archive/refs/heads/main.tar.gz}"
-[ -e "$DEST" ] && { echo "smug: '$DEST' already exists, refusing to overwrite" >&2; exit 1; }
+REPO="OnurByte/smugbrain"
+BIN="${SMUG_BIN:-$HOME/.local/bin}"
+
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64)              T=x86_64-unknown-linux-gnu ;;
+  Linux-aarch64|Linux-arm64) T=aarch64-unknown-linux-gnu ;;
+  Darwin-x86_64)             T=x86_64-apple-darwin ;;
+  Darwin-arm64)              T=aarch64-apple-darwin ;;
+  *) echo "smug: no prebuilt binary for $(uname -s)/$(uname -m). Build it: cargo install --git https://github.com/$REPO" >&2; exit 1 ;;
+esac
+
+if [ -n "${SMUG_VERSION:-}" ]; then BASE="${SMUG_BASE:-https://github.com/$REPO/releases/download/$SMUG_VERSION}"
+else BASE="${SMUG_BASE:-https://github.com/$REPO/releases/latest/download}"; fi
+
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-curl -fsSL "$URL" | tar -xz -C "$TMP"
-mkdir -p "$DEST"
-cp -R "$TMP"/*/template/. "$DEST"/
-echo "smug: your brain has been replaced. Open '$DEST' in Obsidian."
+ASSET="smug-$T.tar.gz"
+curl -fsSL "$BASE/$ASSET" -o "$TMP/$ASSET"
+curl -fsSL "$BASE/SHA256SUMS" -o "$TMP/SHA256SUMS"
+
+WANT="$(awk -v f="$ASSET" '$2==f {print $1}' "$TMP/SHA256SUMS")"
+if command -v sha256sum >/dev/null 2>&1; then GOT="$(sha256sum "$TMP/$ASSET" | cut -d' ' -f1)"
+else GOT="$(shasum -a 256 "$TMP/$ASSET" | cut -d' ' -f1)"; fi
+[ -n "$WANT" ] && [ "$WANT" = "$GOT" ] || { echo "smug: checksum mismatch, refusing to install" >&2; exit 1; }
+
+tar -xzf "$TMP/$ASSET" -C "$TMP"
+mkdir -p "$BIN"
+install -m 755 "$TMP/smug" "$BIN/smug"
+echo "smug: installed $("$BIN/smug" --version) to $BIN/smug"
+case ":$PATH:" in *":$BIN:"*) ;; *) echo "smug: add $BIN to your PATH" ;; esac
+echo "smug: next -> smug init my-brain"

@@ -52,8 +52,8 @@ save("banner.svg", b)
 
 # ---------- 1.2 stats ----------
 rows = [("100%", "of your notes are plain Markdown", 100, "Open, copy, print, or leave any time."),
-        ("27 ms", "to search 2,000 notes", 0, "Index rebuilt from scratch on every query. Synthetic vault."),
-        ("0", "files lost with 8 writers at once", 0, "1 write accepted, 7 refused on hash conflict. Nothing overwritten."),
+        ("12 ms", "to search 2,000 notes", 0, "Persistent index. First build 354 ms. Synthetic vault."),
+        ("0", "files lost with 8 writers at once", 0, "1 write accepted, 7 refused on hash conflict. Automated test."),
         ("4 MB", "one binary, nothing else to install", 0, "No Python. No Node. No server. No account.")]
 body = ""
 for i, (big, label, pct, note) in enumerate(rows):
@@ -61,7 +61,7 @@ for i, (big, label, pct, note) in enumerate(rows):
     body += t(100, y + 34, big, 52, 700, RED) + t(330, y + 8, label, 15, 700) + t(330, y + 28, note, 12.5, 300, GRAY)
     if pct: body += f'<rect x="330" y="{y+38}" width="500" height="6" fill="#EEE"/><rect x="330" y="{y+38}" width="{500*pct/100:.0f}" height="6" fill="{INK}"/>'
     body += f'<line x1="100" y1="{y+60}" x2="{W-36}" y2="{y+60}" stroke="#DDD"/>' if i < 3 else ""
-body += t(100, 460, "Measured 2026-11-12 with smug 0.1.0. Reproduce: see Tests in the README.", 12, 300, GRAY)
+body += t(100, 460, "Measured 2026-11-12 with smug 0.2.0. Writers test runs in CI (cargo test).", 12, 300, GRAY)
 save("card-stats.svg", page(490, "By the numbers", "1.1", body))
 
 # ---------- 1.8 compare ----------

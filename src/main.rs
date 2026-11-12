@@ -6,6 +6,7 @@ use std::{
     env, fs,
     io::{Read, Write},
     path::{Component, Path, PathBuf},
+    collections::HashSet,
     process::{exit, Command},
     thread::sleep,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -119,24 +120,33 @@ fn log_event(c: &Connection, kind: &str, path: &str, hash: &str, r: Option<i64>)
     Ok(c.last_insert_rowid())
 }
 
-struct Lock(PathBuf);
+/// OS-level advisory lock: released by the kernel if the process dies, so it can never go stale.
+struct Lock(#[allow(dead_code)] fs::File);
 impl Lock {
     fn take(root: &Path) -> Result<Lock, String> {
         fs::create_dir_all(root.join(".smug")).map_err(|e| e.to_string())?;
-        let p = root.join(".smug/lock");
+        let f = fs::OpenOptions::new().create(true).write(true).truncate(false).open(root.join(".smug/lock")).map_err(|e| e.to_string())?;
         for _ in 0..100 {
-            if fs::OpenOptions::new().write(true).create_new(true).open(&p).is_ok() {
-                return Ok(Lock(p));
+            match f.try_lock() {
+                Ok(()) => return Ok(Lock(f)),
+                Err(fs::TryLockError::WouldBlock) => sleep(Duration::from_millis(50)),
+                Err(fs::TryLockError::Error(e)) => return Err(e.to_string()),
             }
-            sleep(Duration::from_millis(50));
         }
-        Err("vault is locked (stale .smug/lock? delete it if no smug is running)".into())
+        Err("vault is busy (another smug is writing)".into())
     }
 }
-impl Drop for Lock {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.0);
+
+/// Every existing component of `rel` under `root` must be a real file or directory.
+fn no_symlinks(root: &Path, rel: &Path) -> Result<(), String> {
+    let mut p = root.to_path_buf();
+    for c in rel.components() {
+        p.push(c);
+        if fs::symlink_metadata(&p).map(|m| m.file_type().is_symlink()).unwrap_or(false) {
+            return Err(format!("symlink in path: {}", p.display()));
+        }
     }
+    Ok(())
 }
 
 // ---------- commands ----------
@@ -171,13 +181,26 @@ fn scan(_: &[String]) -> R {
 }
 
 fn backup(_: &[String]) -> R {
-    if scan(&[])? != 0 {
-        eprintln!("smug: backup stopped. Move the files above into .secrets/ and retry.");
-        return Ok(1);
-    }
     let root = vault();
     let git = |args: &[&str]| Command::new("git").arg("-C").arg(&root).args(args).status();
     if !git(&["add", "-A"])?.success() {
+        return Ok(1);
+    }
+    // Scan exactly what is staged (the blobs), not the working tree: nothing can change between scan and commit.
+    let o = Command::new("git").arg("-C").arg(&root).args(["diff", "--cached", "--name-only", "-z"]).output()?;
+    let pats = patterns();
+    let mut bad = 0;
+    for name in o.stdout.split(|&b| b == 0).filter(|s| !s.is_empty()) {
+        let name = String::from_utf8_lossy(name).to_string();
+        let blob = Command::new("git").arg("-C").arg(&root).args(["show", &format!(":{name}")]).output()?;
+        for h in hits(&pats, &blob.stdout) {
+            bad += 1;
+            println!("BLOCKED {h}: {name}");
+        }
+    }
+    if bad > 0 {
+        git(&["reset", "-q"])?;
+        eprintln!("smug: backup stopped, nothing committed. Move those files into .secrets/ and retry.");
         return Ok(1);
     }
     let msg = format!("Vault backup: {}", now());
@@ -186,8 +209,11 @@ fn backup(_: &[String]) -> R {
 }
 
 fn write(a: &[String]) -> R {
-    let rel = safe_rel(a.first().ok_or("usage: smug write <note.md> [--expect <sha256|new>]")?)?;
+    let rel = safe_rel(a.first().ok_or("usage: smug write <note.md> --expect <sha256|new>")?)?;
     let expect = a.iter().position(|x| x == "--expect").and_then(|i| a.get(i + 1));
+    if expect.is_none() && !a.iter().any(|x| x == "--force") {
+        return Err("--expect <sha256|new> is required (or --force to overwrite blindly)".into());
+    }
     let mut data = vec![];
     std::io::stdin().read_to_end(&mut data)?;
     if !hits(&patterns(), &data).is_empty() {
@@ -196,9 +222,7 @@ fn write(a: &[String]) -> R {
     let root = vault();
     let _lock = Lock::take(&root)?;
     let path = root.join(&rel);
-    if fs::symlink_metadata(&path).map(|m| m.file_type().is_symlink()).unwrap_or(false) {
-        return Err("target is a symlink".into());
-    }
+    no_symlinks(&root, &rel)?;
     let cur = fs::read(&path).ok().map(|d| sha(&d));
     if let Some(e) = expect {
         let ok = match (&cur, e.as_str()) {
@@ -238,36 +262,96 @@ fn history(a: &[String]) -> R {
     Ok(0)
 }
 
+fn refresh_index(root: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+    fs::create_dir_all(root.join(".smug"))?;
+    let c = Connection::open(root.join(".smug/index.db"))?;
+    c.execute_batch("CREATE TABLE IF NOT EXISTS docs(path TEXT PRIMARY KEY, sig TEXT); CREATE VIRTUAL TABLE IF NOT EXISTS n USING fts5(path, body, tokenize='unicode61 remove_diacritics 2');")?;
+    let pats = patterns();
+    let mut files = vec![];
+    walk(root, &[".git", ".smug", ".secrets", ".obsidian", "900-archive"], &mut files);
+    let tx = c.unchecked_transaction()?;
+    let (mut seen, mut changed) = (HashSet::new(), 0);
+    for f in files.iter().filter(|f| f.extension().is_some_and(|e| e == "md")) {
+        let rel = f.strip_prefix(root).unwrap_or(f).to_string_lossy().to_string();
+        let m = fs::metadata(f)?;
+        let t = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0);
+        let sig = format!("{}:{t}", m.len());
+        seen.insert(rel.clone());
+        let old: Option<String> = tx.query_row("SELECT sig FROM docs WHERE path=?", [&rel], |r| r.get(0)).ok();
+        if old.as_deref() == Some(sig.as_str()) {
+            continue;
+        }
+        changed += 1;
+        tx.execute("DELETE FROM n WHERE path=?", [&rel])?;
+        let d = fs::read(f)?;
+        if hits(&pats, &d).is_empty() {
+            tx.execute("INSERT INTO n(path,body) VALUES(?,?)", params![rel, String::from_utf8_lossy(&d)])?;
+        } // secret-shaped notes are never indexed
+        tx.execute("INSERT OR REPLACE INTO docs(path,sig) VALUES(?,?)", params![rel, sig])?;
+    }
+    let all: Vec<String> = {
+        let mut st = tx.prepare("SELECT path FROM docs")?;
+        let v = st.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?;
+        v
+    };
+    for p in all.iter().filter(|p| !seen.contains(*p)) {
+        changed += 1;
+        tx.execute("DELETE FROM n WHERE path=?", [p])?;
+        tx.execute("DELETE FROM docs WHERE path=?", [p])?;
+    }
+    tx.commit()?;
+    Ok(changed)
+}
+
 fn search(a: &[String]) -> R {
     if a.is_empty() {
         return Err("usage: smug search <words>".into());
     }
     let t0 = Instant::now();
     let root = vault();
-    let pats = patterns();
-    let c = Connection::open_in_memory()?;
-    c.execute_batch("CREATE VIRTUAL TABLE n USING fts5(path, body, tokenize='unicode61 remove_diacritics 2');")?;
-    let mut files = vec![];
-    walk(&root, &[".git", ".smug", ".secrets", ".obsidian", "900-archive"], &mut files);
-    {
-        let tx = c.unchecked_transaction()?;
-        for f in files.iter().filter(|f| f.extension().is_some_and(|e| e == "md")) {
-            let Ok(d) = fs::read(f) else { continue };
-            if !hits(&pats, &d).is_empty() {
-                continue; // secret-shaped notes are never indexed
-            }
-            tx.execute("INSERT INTO n(path,body) VALUES(?,?)", params![f.strip_prefix(&root).unwrap_or(f).to_string_lossy(), String::from_utf8_lossy(&d)])?;
-        }
-        tx.commit()?;
-    }
+    let changed = refresh_index(&root)?;
+    let c = Connection::open(root.join(".smug/index.db"))?;
     let q = a.iter().map(|w| format!("\"{}\"", w.replace('"', "\"\""))).collect::<Vec<_>>().join(" OR ");
     let mut st = c.prepare("SELECT path, snippet(n,1,'[',']','…',10) FROM n WHERE n MATCH ? ORDER BY bm25(n) LIMIT 5")?;
     for r in st.query_map([q], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
         let (p, s) = r?;
         println!("{p}\n    {}", s.replace('\n', " "));
     }
-    eprintln!("{} ms", t0.elapsed().as_millis());
+    eprintln!("{} ms ({changed} reindexed)", t0.elapsed().as_millis());
     Ok(0)
+}
+
+fn index(_: &[String]) -> R {
+    let n = refresh_index(&vault())?;
+    println!("index up to date ({n} changed)");
+    Ok(0)
+}
+
+fn setup(a: &[String]) -> R {
+    let root = vault();
+    match a.first().map(String::as_str) {
+        Some("claude") => {
+            let p = root.join(".claude/settings.json");
+            let snippet = r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"smug context"}]}]}}"#;
+            if p.exists() {
+                println!("{} exists. Merge this by hand:\n{snippet}", p.display());
+            } else {
+                fs::create_dir_all(p.parent().unwrap())?;
+                fs::write(&p, snippet)?;
+                println!("wrote {}: Claude Code now starts every session with `smug context`.", p.display());
+            }
+            Ok(0)
+        }
+        Some("codex") => {
+            println!("Codex reads AGENTS.md at the vault root (smug init already wrote it). Nothing else to do.");
+            Ok(0)
+        }
+        Some("hermes") => {
+            println!("Run `smug context` at session start and feed its output to Hermes as context.");
+            Ok(0)
+        }
+        _ => Err("usage: smug setup claude|codex|hermes".into()),
+    }
 }
 
 fn context(_: &[String]) -> R {
@@ -327,8 +411,14 @@ fn main() {
         Some("search") => search(rest),
         Some("context") => context(rest),
         Some("doctor") => doctor(rest),
+        Some("index") => index(rest),
+        Some("setup") => setup(rest),
+        Some("--version" | "version") => {
+            println!("smug {}", env!("CARGO_PKG_VERSION"));
+            Ok(0)
+        }
         _ => {
-            println!("smug: your brain has been replaced.\n  init [dir]   new vault\n  search <q>   find notes (words)\n  context      print what an agent should read first\n  write <f> [--expect <sha256|new>]   atomic, hash-checked edit from stdin\n  log [n]      write history\n  scan         secret guard\n  backup       scan, commit, push\n  doctor       health check + crash recovery");
+            println!("smug: your brain has been replaced.\n  init [dir]   new vault\n  search <q>   find notes (words)\n  context      print what an agent should read first\n  write <f> --expect <sha256|new>   atomic, hash-checked edit from stdin\n  index        refresh the persistent search index\n  setup <claude|codex|hermes>   wire an agent in\n  log [n]      write history\n  scan         secret guard\n  backup       scan, commit, push\n  doctor       health check + crash recovery");
             Ok(0)
         }
     };

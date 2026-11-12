@@ -1,0 +1,72 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: ubuntu-22.04,     target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: macos-latest,     target: aarch64-apple-darwin }
+          - { os: macos-latest,     target: x86_64-apple-darwin }
+          - { os: windows-latest,   target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add ${{ matrix.target }}
+      - run: cargo test --release
+        if: matrix.target != 'x86_64-apple-darwin'
+      - run: cargo build --release --target ${{ matrix.target }}
+      - name: package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir out
+          tar -czf out/smug-${{ matrix.target }}.tar.gz -C target/${{ matrix.target }}/release smug
+      - name: package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          mkdir out
+          Compress-Archive -Path target/${{ matrix.target }}/release/smug.exe -DestinationPath out/smug-${{ matrix.target }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smug-${{ matrix.target }}
+          path: out/*
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: checksums
+        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "smug $GITHUB_REF_NAME" --notes-file - <<'EOF'
+          ## Install (no Rust, no compiler)
+
+          **macOS / Linux**
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
+          ```
+
+          **Windows (PowerShell)**
+          ```powershell
+          irm https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.ps1 | iex
+          ```
+
+          Then: `smug init my-brain`
+
+          Or download the file for your system below and verify it against `SHA256SUMS`.
+          FreeBSD / Haiku: `cargo install --git https://github.com/OnurByte/smugbrain`
+          EOF
