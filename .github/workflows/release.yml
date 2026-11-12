@@ -37,8 +37,45 @@ jobs:
         with:
           name: smug-${{ matrix.target }}
           path: out/*
+  freebsd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cross-platform-actions/action@v1.7.0
+        with:
+          operating_system: freebsd
+          version: '15.1'
+          run: |
+            sudo pkg install -y rust
+            cargo test --release
+            cargo build --release
+            mkdir out
+            tar -czf out/smug-x86_64-unknown-freebsd.tar.gz -C target/release smug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smug-x86_64-unknown-freebsd
+          path: out/*
+  haiku:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cross-platform-actions/action@v1.7.0
+        with:
+          operating_system: haiku
+          run: |
+            pkgman install -y rust_bin || pkgman install -y rust
+            cargo test --release
+            cargo build --release
+            mkdir out
+            tar -czf out/smug-x86_64-unknown-haiku.tar.gz -C target/release smug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smug-x86_64-unknown-haiku
+          path: out/*
   publish:
-    needs: build
+    needs: [build, freebsd, haiku]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.freebsd.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -68,5 +105,5 @@ jobs:
           Then: `smug init my-brain`
 
           Or download the file for your system below and verify it against `SHA256SUMS`.
-          FreeBSD / Haiku: `cargo install --git https://github.com/OnurByte/smugbrain`
+          FreeBSD: `fetch -qo - https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh`
           EOF

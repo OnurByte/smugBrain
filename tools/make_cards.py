@@ -52,16 +52,16 @@ save("banner.svg", b)
 
 # ---------- 1.2 stats ----------
 rows = [("100%", "of your notes are plain Markdown", 100, "Open, copy, print, or leave any time."),
-        ("12 ms", "to search 2,000 notes", 0, "Persistent index. First build 354 ms. Synthetic vault."),
+        ("21 ms", "to search 2,000 notes", 0, "Tantivy index, warm. First build 139 ms. Synthetic vault."),
         ("0", "files lost with 8 writers at once", 0, "1 write accepted, 7 refused on hash conflict. Automated test."),
-        ("4 MB", "one binary, nothing else to install", 0, "No Python. No Node. No server. No account.")]
+        ("7 MB", "one binary, nothing else to install", 0, "No Python. No Node. No C library. No server. No account.")]
 body = ""
 for i, (big, label, pct, note) in enumerate(rows):
     y = 130 + i * 78
     body += t(100, y + 34, big, 52, 700, RED) + t(330, y + 8, label, 15, 700) + t(330, y + 28, note, 12.5, 300, GRAY)
     if pct: body += f'<rect x="330" y="{y+38}" width="500" height="6" fill="#EEE"/><rect x="330" y="{y+38}" width="{500*pct/100:.0f}" height="6" fill="{INK}"/>'
     body += f'<line x1="100" y1="{y+60}" x2="{W-36}" y2="{y+60}" stroke="#DDD"/>' if i < 3 else ""
-body += t(100, 460, "Measured 2026-11-12 with smug 0.2.0. Writers test runs in CI (cargo test).", 12, 300, GRAY)
+body += t(100, 460, "Measured 2026-11-12 with smug 0.3.0. 19 tests run in CI on Linux, macOS and Windows.", 12, 300, GRAY)
 save("card-stats.svg", page(490, "By the numbers", "1.1", body))
 
 # ---------- 1.8 compare ----------
@@ -69,8 +69,11 @@ cols = ["smugBrain", "avenoxbeyin", "obsidian-2nd", "Graphiti", "mem0"]
 rows = [("Notes are plain Markdown files", ["Yes", "Yes", "Yes", "No: graph DB", "No: vector DB"]),
         ("License", ["Public domain", "MIT", "MIT", "Apache-2.0", "Apache-2.0"]),
         ("Needs a database or account", ["No", "No", "No", "Graph DB", "Sign-up or DB"]),
-        ("Secret scan before every backup", ["5, always on", "opt-in", "—", "—", "—"]),
-        ("Runtime to install", ["1 binary", "Python", "Python", "Python", "Python"])]
+        ("Runtime to install", ["1 binary", "Python", "Python", "Python", "Python"]),
+        ("Secret scan before every backup", ["5, always on", "opt-in", "\u2014", "\u2014", "\u2014"]),
+        ("Stale decisions never returned", ["Yes", "\u2014", "Yes", "Yes", "\u2014"]),
+        ("Impact preview before a change", ["Yes", "\u2014", "\u2014", "\u2014", "\u2014"]),
+        ("Eval gate before a change", ["Yes", "\u2014", "\u2014", "\u2014", "\u2014"])]
 x0, cw = 330, 104
 body = ""
 for j, c in enumerate(cols):
@@ -84,6 +87,6 @@ for i, (lab, vals) in enumerate(rows):
     for j, v in enumerate(vals):
         x = x0 + j * cw + cw / 2 - 8
         body += t(x, y + 8, v, 11.5, 700 if j == 0 else 300, PAPER if j == 0 else (GRAY if v.startswith(("—",)) else INK), "middle")
-body += t(100, 478, "Checked 2026-11-12: licenses via the GitHub API, the rest from each project's README. \"—\" = not found there.", 11, 300, GRAY)
-body += t(100, 496, "Where they beat us today: community size, agent count, semantic search (ours is keyword-only so far).", 11, 700, INK)
-save("card-compare.svg", page(520, "How we compare", "1.2", body))
+body += t(100, 650, "Checked 2026-11-12: licenses via the GitHub API, the rest from each project's README. \"—\" = not found there (may live in code or other docs).", 11, 300, GRAY)
+body += t(100, 670, "Where they beat us today: community size, agent count, built-in semantic search (ours needs QMD: smug search --deep).", 11, 700, INK)
+save("card-compare.svg", page(700, "How we compare", "1.2", body))

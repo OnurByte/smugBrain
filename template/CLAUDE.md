@@ -24,3 +24,7 @@ You are the user's thinking partner and memory. Be direct and short; no corporat
 - Edit notes with `smug write <file> --expect <sha256|new>`. A conflict (exit 2) means someone else changed the file: re-read it and retry.
 - Back up with `smug backup`. If it stops on a secret, move that file into `.secrets/`.
 - Something feels off? `smug doctor`.
+- Decisions: `smug decide <id> --source <s>`. Before acting on one, `smug check <id>` (CURRENT / STALE / CONFLICTED / UNSUPPORTED). Never act on STALE.
+- Changing a decision: `smug patch <old> --new-id <id> --source <s>`, read what it touches (`smug impact`), `smug eval <n>`, then `smug apply <n>`. Never edit the old decision by hand.
+- Something failed? `smug fail <id> --method <m> --reason <r>`. Before retrying a method: `smug warn <text>`.
+- Add questions the memory must keep answering right to `evals/cases.jsonl`.

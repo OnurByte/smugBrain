@@ -1,0 +1,25 @@
+smug: your brain has been replaced.
+
+notes
+  init [dir]                         new vault
+  search [--history] [--deep] <q>    find notes (stale decisions never come back; --deep = QMD semantic)
+  context                            what an agent should read first
+  write <f> --expect <sha256|new>    atomic, hash-checked edit from stdin
+  log [n]                            write history        index   refresh search index
+
+memory
+  decide <id> --source <s> ...       record a decision (source required)
+  fail <id> --method <m> --reason <r>   record something that failed (negative memory)
+  check <id>                         CURRENT / STALE / CONFLICTED / UNSUPPORTED
+  warn <text>                        has this been tried and failed before?
+  at <date> [words]                  what was valid and known on that date
+  impact <id>                        what depends on this decision
+  patch <old> --new-id <id> --source <s>   propose a change, show what it touches
+  eval [patch]                       run evals/cases.jsonl, before/after a patch
+  apply <patch> [--force]            apply a patch if evals do not regress
+  feedback <note> used|useful|harmful   outcome memory (nudges ranking)
+  bench                              recall@k, MRR, latency on evals/cases.jsonl
+
+safety
+  scan      secret guard        backup   scan staged files, commit, push
+  doctor    health + crash recovery       setup <claude|codex|hermes>

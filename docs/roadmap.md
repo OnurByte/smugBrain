@@ -37,8 +37,22 @@ Recall@5, MRR, nDCG@5 · false-positive and abstention rate · stale-claim suppr
 
 Acceptance gates: zero data loss, zero secret leakage, correct source references, no retrieval regression versus the prototype. Goal: p95 < 250 ms for warm keyword queries on small and medium vaults (a target, not a measurement). The model-backed search never runs on every prompt.
 
-## Status (2026-11-12, v0.2.0)
+## Status (2026-11-12, v0.3.0)
 
-Done: `init`, `search` (persistent SQLite FTS5 index, incremental), `context`, `write` (SHA-256 compare-and-swap required by default, OS-level lock, symlink and path-escape refusal, secret refusal, intent/commit journal, atomic rename), `log`, `scan`, `backup` (scans the staged blobs, not the working tree), `doctor` (reconciles unfinished writes), `setup claude`, prebuilt binaries for Linux (x86-64, ARM), macOS (Intel, Apple silicon) and Windows with checksum-verified installers, CI on three operating systems.
+Stack: one Rust binary. redb for state, Tantivy for search (Turkish-friendly: lower-cased and ASCII-folded), an append-only journal in `history/events.jsonl` that lives in git and rebuilds the database if `.smug/` is lost. No SQLite, no C library.
 
-Not done: write history is not stored in git yet; source/claim/decision model; `patch` / `impact` / `eval` (memory change impact and behavioural regression tests); QMD semantic search; real Codex and Hermes hooks; FreeBSD and Haiku binaries; an independent benchmark.
+Done:
+- Safe writes: SHA-256 compare-and-swap required, OS lock, symlink/path-escape/secret refusal, intent/commit journal, crash recovery in `doctor`.
+- Search: persistent incremental index, hard filter that drops superseded decisions, `--history` to see them, `--deep` hands off to QMD for semantic search when installed.
+- Decisions with sources, validity and dependencies (`decide`, `check`, `at`, `impact`).
+- Memory Patch (`patch`), behavioural eval before and after (`eval`), gated `apply`.
+- Negative memory (`fail`, `warn`), outcome feedback (`feedback`), `bench` (recall@k, MRR, latency on your own cases).
+- Agents: Claude Code session and prompt hooks (`setup claude`), Codex via `AGENTS.md`, Hermes via `smug context` and `smug hook prompt`.
+- Prebuilt binaries and checksum-verified installers.
+
+Not done, stated plainly:
+- Semantic search is not built in (QMD adapter only).
+- `eval` checks what retrieval returns, not what a model answers. There is no model-in-the-loop behavioural test yet.
+- The benchmark is self-run on your own cases. There is no independent, public benchmark.
+- Codex and Hermes have no native lifecycle hooks in smug; they follow the instructions in `AGENTS.md` or call the commands.
+- Outcome feedback is manual (`smug feedback`); nothing detects automatically whether an agent used a note.

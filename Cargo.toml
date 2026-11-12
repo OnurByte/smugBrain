@@ -1,17 +1,17 @@
 [package]
 name = "smug"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "smugBrain: plain-Markdown memory for agents. One binary."
+description = "smugBrain: plain-Markdown memory for agents. One binary, redb + Tantivy."
 license = "Unlicense"
 
 [dependencies]
-rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 regex = "1"
-
-[dev-dependencies]
-rusqlite = { version = "0.32", features = ["bundled"] }
+redb = "4.5.0"
+tantivy = { version = "0.27.0", default-features = false, features = ["mmap", "lz4-compression"] }
+serde_json = "1.0.154"
+serde = { version = "1.0.229", features = ["derive"] }
 
 [profile.release]
 opt-level = 3

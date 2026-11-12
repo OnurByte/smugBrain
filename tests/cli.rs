@@ -84,17 +84,19 @@ fn stale_lock_file_does_not_block() {
 }
 
 #[test]
-fn crash_recovery() {
+fn crash_recovery_and_journal_replay() {
     let v = vault("crash");
     smug(&v, &["write", "a.md", "--expect", "new"], "x");
-    let c = rusqlite::Connection::open(v.join(".smug/state.db")).unwrap();
-    c.execute("INSERT INTO events(ts,kind,path,hash) VALUES(0,'intent','x.md','deadbeef')", []).unwrap(); // a write that died mid-flight
-    drop(c);
+    // a write that died after journalling its intent, then the whole .smug/ state is lost
+    let mut j = fs::OpenOptions::new().append(true).open(v.join("history/events.jsonl")).unwrap();
+    writeln!(j, r#"{{"id":99,"ts":0,"kind":"intent","path":"x.md","hash":"deadbeef","ref":null}}"#).unwrap();
+    fs::remove_dir_all(v.join(".smug")).unwrap();
     let (code, out, _) = smug(&v, &["doctor"], "");
     assert_eq!(code, 0, "{out}");
     assert!(out.contains("1 unfinished"), "{out}");
     let (_, out2, _) = smug(&v, &["doctor"], "");
     assert!(out2.contains("0 unfinished"), "{out2}");
+    assert!(smug(&v, &["log", "50"], "").1.contains("abort"));
 }
 
 #[test]
@@ -133,4 +135,93 @@ fn backup_blocks_secrets() {
     assert!(out.contains("BLOCKED"), "{out}");
     assert!(!git(&["log", "-1"]).status.success(), "nothing may be committed");
     assert!(git(&["diff", "--cached", "--name-only"]).stdout.is_empty(), "nothing may stay staged");
+}
+
+#[test]
+fn decisions_check_and_time_machine() {
+    let v = vault("dec");
+    assert_eq!(smug(&v, &["decide", "sqlite", "--topic", "db", "--date", "2026-01-01"], "use sqlite").0, 1, "source is required");
+    assert_eq!(smug(&v, &["decide", "sqlite", "--topic", "db", "--source", "adr-1", "--date", "2026-01-01", "--known-at", "2026-01-02"], "use sqlite everywhere").0, 0);
+    assert_eq!(smug(&v, &["decide", "sqlite", "--source", "x"], "dup").0, 2);
+    assert_eq!(smug(&v, &["decide", "../evil", "--source", "x"], "x").0, 1);
+    assert_eq!(smug(&v, &["check", "sqlite"], "").0, 0);
+    assert_eq!(smug(&v, &["decide", "mysql", "--topic", "db", "--source", "adr-2"], "use mysql").0, 0);
+    let (c, out, _) = smug(&v, &["check", "sqlite"], "");
+    assert_eq!(c, 3);
+    assert!(out.contains("CONFLICTED"), "{out}");
+    assert!(smug(&v, &["at", "2026-02-01", "sqlite"], "").1.contains("sqlite"));
+    assert!(smug(&v, &["at", "2025-12-31", "sqlite"], "").1.is_empty(), "not valid yet");
+    assert!(smug(&v, &["at", "2026-01-01", "sqlite"], "").1.is_empty(), "valid but nobody knew yet");
+}
+
+#[test]
+fn patch_eval_apply_and_stale_never_returned() {
+    let v = vault("patch");
+    smug(&v, &["decide", "sqlite", "--topic", "db", "--source", "adr-1", "--date", "2026-01-01"], "we use sqlite for storage");
+    fs::write(v.join("300-projects/backup.md"), "---\ndepends_on: [sqlite]\n---\nbackup plan for sqlite file copy").unwrap();
+    fs::write(v.join("300-projects/deploy.md"), "see [[backup]] before deploy").unwrap();
+    let imp = smug(&v, &["impact", "sqlite"], "").1;
+    assert!(imp.contains("300-projects/backup.md") && imp.contains("  300-projects/deploy.md"), "{imp}");
+    fs::write(v.join("evals/cases.jsonl"), concat!(
+        r#"{"q":"which storage do we use","expect":["500-knowledge/decisions/postgres.md"],"absent":["500-knowledge/decisions/sqlite.md"]}"#, "\n",
+        r#"{"q":"backup plan","expect":["300-projects/backup.md"]}"#, "\n")).unwrap();
+    let (c, out, _) = smug(&v, &["patch", "sqlite", "--new-id", "postgres", "--source", "adr-7", "--date", "2026-11-01", "--title", "storage"], "we use postgres for storage");
+    assert_eq!(c, 0, "{out}");
+    assert!(out.contains("300-projects/backup.md"), "{out}");
+    assert!(!v.join("500-knowledge/decisions/postgres.md").exists(), "a patch must not apply anything");
+    let (c, out, _) = smug(&v, &["eval", "1"], "");
+    assert_eq!(c, 0, "{out}");
+    assert!(out.contains("FIXED"), "{out}");
+    assert_eq!(smug(&v, &["eval"], "").0, 1, "before the patch the first case fails");
+    assert_eq!(smug(&v, &["apply", "1"], "").0, 0);
+    let (_, out, _) = smug(&v, &["search", "storage"], "");
+    assert!(out.contains("postgres.md") && !out.contains("sqlite.md"), "{out}");
+    assert!(smug(&v, &["search", "--history", "sqlite"], "").1.contains("sqlite.md"));
+    let (c, out, _) = smug(&v, &["check", "sqlite"], "");
+    assert!(c == 3 && out.contains("STALE"), "{out}");
+    assert_eq!(smug(&v, &["apply", "1"], "").0, 1, "already applied");
+}
+
+#[test]
+fn eval_blocks_a_regressing_patch() {
+    let v = vault("reg");
+    smug(&v, &["decide", "a", "--source", "s", "--date", "2026-01-01"], "alpha topic text");
+    fs::write(v.join("evals/cases.jsonl"), concat!(r#"{"q":"alpha topic","expect":["500-knowledge/decisions/a.md"]}"#, "\n")).unwrap();
+    smug(&v, &["patch", "a", "--new-id", "b", "--source", "s2"], "totally different words");
+    let (c, out, _) = smug(&v, &["eval", "1"], "");
+    assert_eq!(c, 1, "{out}");
+    assert!(out.contains("REGRESSED"), "{out}");
+    assert_eq!(smug(&v, &["apply", "1"], "").0, 1);
+    assert!(v.join("500-knowledge/decisions/a.md").exists() && !v.join("500-knowledge/decisions/b.md").exists());
+}
+
+#[test]
+fn negative_memory_warns() {
+    let v = vault("neg");
+    assert_eq!(smug(&v, &["fail", "retry-loop", "--method", "retry forever on timeout", "--reason", "hammered the API", "--version", "1.2"], "").0, 0);
+    let (_, out, _) = smug(&v, &["warn", "lets retry forever on the timeout"], "");
+    assert!(out.contains("WARN retry-loop") && out.contains("hammered the API"), "{out}");
+    assert!(smug(&v, &["warn", "write documentation"], "").1.is_empty());
+}
+
+#[test]
+fn prompt_hook_and_feedback() {
+    let v = vault("hook");
+    fs::write(v.join("500-knowledge/tantivy.md"), "tantivy index notes").unwrap();
+    let (c, out, _) = smug(&v, &["hook", "prompt"], r#"{"prompt":"how does tantivy work"}"#);
+    assert_eq!(c, 0);
+    assert!(out.contains("500-knowledge/tantivy.md"), "{out}");
+    assert_eq!(smug(&v, &["hook", "prompt"], "not json").0, 0);
+    assert!(smug(&v, &["feedback", "500-knowledge/tantivy.md", "useful"], "").1.contains("utility 2"));
+}
+
+#[test]
+fn turkish_folding_and_bench() {
+    let v = vault("tr");
+    fs::write(v.join("500-knowledge/tr.md"), "Karar: ışık şemsiye çocuk").unwrap();
+    assert!(smug(&v, &["search", "isik", "semsiye", "cocuk"], "").1.contains("tr.md"));
+    fs::write(v.join("evals/cases.jsonl"), concat!(r#"{"q":"semsiye","expect":["500-knowledge/tr.md"]}"#, "\n")).unwrap();
+    let (c, out, _) = smug(&v, &["bench"], "");
+    assert_eq!(c, 0);
+    assert!(out.contains("recall@k 1.000") && out.contains("MRR 1.000"), "{out}");
 }
