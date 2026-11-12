@@ -1,6 +1,13 @@
 <p align="center"><img src="assets/banner.svg" alt="smugBrain: local-first memory for AI coding agents" width="880"></p>
 
-<p align="center"><img src="assets/badges.svg" alt="release, tests, license, platforms, MCP" width="880"></p>
+<p align="center">
+<a href="https://github.com/OnurByte/smugbrain/releases/latest"><img src="assets/badge-release.svg" alt="release"></a>
+<a href="https://github.com/OnurByte/smugbrain/actions/workflows/ci.yml"><img src="assets/badge-tests.svg" alt="tests"></a>
+<img src="assets/badge-license.svg" alt="public domain">
+<img src="assets/badge-rust.svg" alt="written in Rust">
+<img src="assets/badge-mcp.svg" alt="speaks MCP">
+<img src="assets/badge-nocloud.svg" alt="no account, no cloud">
+</p>
 
 # smugBrain: local-first memory for AI coding agents
 
@@ -10,25 +17,42 @@ Better than your brain. Objectively.
 
 ## Install
 
-Prebuilt binaries are on the **[Releases page](https://github.com/OnurByte/smugbrain/releases/latest)**. Or paste one line; the installer verifies the SHA-256 before it installs anything. (Each block below has a copy button in the top-right corner on GitHub.)
+### Prompt install
 
-macOS, Linux (x86-64, ARM) and Haiku:
+Paste this into your AI agent (Claude Code, Codex, Cursor, Gemini CLI...). It does the rest and asks before it changes anything.
+
+```text
+Install smugBrain on this computer from https://github.com/OnurByte/smugbrain.
+Detect my operating system, download the matching binary from the latest GitHub release,
+verify it against SHA256SUMS, and put it on my PATH. Then run `smug init my-brain`.
+Next run `smug agent install detected --dry-run` and show me exactly what it would change;
+only run it for real after I say yes. Never overwrite existing files, never ask me for secrets,
+and finish by telling me what you installed, what you skipped, and what I should do next.
+```
+
+### Command install
+
+Each block has a copy button in its top-right corner on GitHub. The installer verifies the SHA-256 before it installs anything.
+
+<img src="assets/os-macos.svg" height="28" alt="macOS"> <img src="assets/os-linux.svg" height="28" alt="Linux"> **macOS, Linux (x86-64, ARM) and Haiku**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
 ```
 
-FreeBSD (uses the built-in `fetch`; with `curl` installed the line above works too):
+<img src="assets/os-freebsd.svg" height="28" alt="FreeBSD"> **FreeBSD** (uses the built-in `fetch`; with `curl` installed the line above works too)
 
 ```bash
 fetch -qo - https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
 ```
 
-Windows (PowerShell):
+<img src="assets/os-windows.svg" height="28" alt="Windows"> **Windows** (PowerShell)
 
 ```powershell
 irm https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.ps1 | iex
 ```
+
+Or download a binary from the **[Releases page](https://github.com/OnurByte/smugbrain/releases/latest)**: Linux, macOS (Intel and Apple silicon), Windows, FreeBSD and Haiku, each listed in `SHA256SUMS`.
 
 ## Connect your coding tool
 
@@ -62,15 +86,34 @@ smug agent install cursor
 smug agent install gemini
 ```
 
-Also: `windsurf --global`, `kiro`, `vscode`, `opencode`. Zed and Cline print a snippet to paste. Any other MCP client: use the command `smug mcp`.
+Also: `windsurf --global`, `kiro`, `vscode`, `opencode`. Zed and Cline print a snippet to paste. Any other MCP tool: use the command `smug mcp`.
 
-**What "supported" means here.** Every row above has automated tests for how smug edits that tool's config, and the MCP server is tested with a scripted client over stdio (`smug agent doctor` runs the same check on your machine). We have **not** yet run a live session in each tool, so we do not claim that. Lifecycle hooks (session start, before-edit reminders, capture) exist for Claude Code only; the other tools get the memory tools. `smug agent list` prints the same table with the exact test level.
+<details>
+<summary><b>What "supported" means here</b></summary>
 
-### What your agent can do
+Every setup tool above has automated tests for how smug edits its config, and the MCP server is tested with a scripted client over stdio (`smug agent doctor` runs the same check on your machine). We have **not** yet run a live session in each tool, so we do not claim that. Lifecycle hooks (session start, before-edit reminders, capture) exist for Claude Code only; the other tools get the memory tools. `smug agent list` prints the exact test level per tool.
 
-Six tools, no more: **`smug_recall`** (relevant, still-valid memory), **`smug_check`** (is this decision still valid?), **`smug_explain`** (source, dates, history), **`smug_impact`** (what depends on it), **`smug_propose`** (save something worth remembering), **`smug_feedback`** (did it help?). Four are read-only. `smug_propose` only writes an **inert candidate**: nothing becomes memory until *you* run `smug review` and `smug promote`. Start the server with `smug mcp --read-only` to take the write tools away entirely.
+</details>
 
-## What it does
+<details>
+<summary><b>What your agent can do (six tools)</b></summary>
+
+**`smug_recall`** (relevant, still-valid memory), **`smug_check`** (is this decision still valid?), **`smug_explain`** (source, dates, history), **`smug_impact`** (what depends on it), **`smug_propose`** (save something worth remembering), **`smug_feedback`** (did it help?). Four are read-only. `smug_propose` only writes an **inert candidate**: nothing becomes memory until *you* run `smug review` and `smug promote`. Start the server with `smug mcp --read-only` to take the write tools away entirely.
+
+</details>
+
+## Numbers
+
+<p align="center"><img src="assets/card-stats.svg" alt="By the numbers" width="880"></p>
+
+## Compare
+
+How smugBrain compares with avenoxbeyin, obsidian-second-brain, hafiza-os, Graphiti and mem0. Facts come from each project's own repository and README, checked 2026-11-12. They lead in places and the card says where.
+
+<p align="center"><img src="assets/card-compare.svg" alt="How smugBrain compares with avenoxbeyin, hafiza-os, Graphiti and mem0" width="880"></p>
+
+<details>
+<summary><b>What it does: the commands</b></summary>
 
 ```bash
 smug search rust karar                 # find notes; replaced decisions never come back
@@ -102,17 +145,10 @@ smug apply 1                           # refuses if a question that passed now f
 
 Everyday safety: `smug write note.md --expect <sha256|new>` (atomic; refuses if the file changed under you), `smug backup` (scans exactly what is staged, stops on any secret), `smug doctor` (health check, crash recovery, index repair), `smug bench`, `smug receipts` (what each agent session was shown and used). Full list: run `smug` with no arguments.
 
-## Numbers
+</details>
 
-<p align="center"><img src="assets/card-stats.svg" alt="By the numbers" width="880"></p>
-
-## Compare
-
-How smugBrain compares with avenoxbeyin, obsidian-second-brain, hafiza-os, Graphiti and mem0. Facts come from each project's own repository and README, checked 2026-11-12. They lead in places and the card says where.
-
-<p align="center"><img src="assets/card-compare.svg" alt="How smugBrain compares with avenoxbeyin, hafiza-os, Graphiti and mem0" width="880"></p>
-
-## FAQ
+<details>
+<summary><b>FAQ</b></summary>
 
 **What problem does it solve?** AI agents forget, and worse, they confidently use decisions that were replaced months ago, or retry a fix that failed last week. smugBrain keeps every decision and every failed attempt with its source, commit and test result, and refuses to hand a stale one back.
 
@@ -134,17 +170,25 @@ How smugBrain compares with avenoxbeyin, obsidian-second-brain, hafiza-os, Graph
 
 **Does it search by meaning?** Built-in search is keyword search with Turkish-friendly folding (`isik` finds `ışık`). `smug search --deep` hands the query to [QMD](https://github.com/tobi/qmd) for semantic search when you have it installed.
 
-## Under the hood
+</details>
+
+<details>
+<summary><b>Under the hood</b></summary>
 
 Markdown notes. State in [redb](https://github.com/cberner/redb), search in [Tantivy](https://github.com/quickwit-oss/tantivy). Every write is journalled to `history/events.jsonl`, which lives in git: delete `.smug/` and nothing is lost. Guarantees, data formats, permissions and limits: [docs/design.md](docs/design.md). Release history: [CHANGELOG.md](CHANGELOG.md).
 
-## Limits
+</details>
+
+<details>
+<summary><b>Limits (read this before you rely on it)</b></summary>
 
 - The model in `eval` is whatever command you supply; smug bundles none and the command runs with your privileges (throwaway directory, timeout and output cap, but not a sandbox).
 - `bench` and `eval` run on your own cases; there is no independent public benchmark.
 - Hooks exist for Claude Code only. Other tools get the MCP tools.
 - Automatic feedback is a heuristic: a surfaced note counts as used when its file name appears in what the assistant wrote or did.
 - Live sessions in each listed tool have not been run; see "What supported means here".
+
+</details>
 
 ## Contributing
 
@@ -154,4 +198,4 @@ Pull requests, bug reports and test cases are welcome: see [CONTRIBUTING.md](CON
 
 ## License
 
-Public domain ([Unlicense](LICENSE)). Security: [SECURITY.md](SECURITY.md). Design: NASA Graphics Standards Manual NHB 1430.2 (1976).
+Public domain ([Unlicense](LICENSE)). Security: [SECURITY.md](SECURITY.md). Design: NASA Graphics Standards Manual NHB 1430.2 (1976). Logos identify compatibility and are not endorsements; each belongs to its owner.

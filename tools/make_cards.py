@@ -102,24 +102,28 @@ TESTS = 363  # update with every release: cargo test (Unix)
 badges = [("release", f"v{VERSION}", True), ("tests", f"{TESTS} passing", False), ("license", "public domain", True),
           ("written in", "Rust", False), ("tested on", "Linux macOS Windows FreeBSD Haiku", False), ("speaks", "MCP", True),
           ("needs", "no account, no cloud", False)]
-def badge_row(items, y):
-    out, x = "", 100
-    for lab, val, hot in items:
-        lw, vw = 12 + len(lab) * 6.6, 14 + len(val) * 6.9
-        out += (f'<rect x="{x}" y="{y}" width="{lw:.0f}" height="26" fill="{INK}"/>' + t(x + lw / 2, y + 17.5, lab, 11, 700, PAPER, "middle")
-                + f'<rect x="{x+lw:.0f}" y="{y}" width="{vw:.0f}" height="26" fill="{RED if hot else PAPER}" stroke="{INK}"/>'
-                + t(x + lw + vw / 2, y + 17.5, val, 11, 700, PAPER if hot else INK, "middle"))
-        x += lw + vw + 10
-    return out, x
-r1, _ = badge_row(badges[:4], 22)
-r2, _ = badge_row(badges[4:], 58)
-svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} 96" width="{W}" height="96" font-family="{FONT}" role="img" aria-label="release, tests, license, platforms, MCP">'
-       f'<rect width="{W}" height="96" fill="{PAPER}"/>' + "".join(f'<circle cx="34" cy="{y}" r="9" fill="{INK}"/>' for y in (22, 74)) + r1 + r2 + "</svg>\n")
-save("badges.svg", svg)
+def one_badge(slug, lab, val, hot):
+    lw, vw = 12 + len(lab) * 6.6, 14 + len(val) * 6.9
+    w = lw + vw
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.0f} 26" width="{w:.0f}" height="26" font-family="{FONT}" role="img" aria-label="{esc(lab)}: {esc(val)}">'
+           f'<rect width="{lw:.0f}" height="26" fill="{INK}"/>' + t(lw / 2, 17.5, lab, 11, 700, PAPER, "middle")
+           + f'<rect x="{lw:.0f}" y=".5" width="{vw - .5:.0f}" height="25" fill="{RED if hot else PAPER}" stroke="{INK}"/>'
+           + t(lw + vw / 2, 17.5, val, 11, 700, PAPER if hot else INK, "middle") + "</svg>\n")
+    save(f"badge-{slug}.svg", svg)
+
+for slug, lab, val, hot in [("release", "release", f"v{VERSION}", True), ("tests", "tests", f"{TESTS} passing", False), ("license", "license", "public domain", True),
+                            ("rust", "written in", "Rust", False), ("mcp", "speaks", "MCP", True), ("nocloud", "needs", "no account, no cloud", False)]:
+    one_badge(slug, lab, val, hot)
+
+# ---------- operating system icons (real logos, one file each) ----------
+LOGOS = Path(__file__).resolve().parent / "logos"
+for slug, f in [("windows", "si9-windows.svg"), ("macos", "si9-apple.svg"), ("linux", "si9-linux.svg"), ("freebsd", "si9-freebsd.svg")]:
+    raw = (LOGOS / f).read_text()
+    inner = re.sub(r"<title>.*?</title>", "", re.search(r"<svg[^>]*>(.*)</svg>", raw, re.S).group(1), flags=re.S)
+    assert "<script" not in inner.lower()
+    save(f"os-{slug}.svg", f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" role="img" aria-label="{slug}"><rect x=".5" y=".5" width="39" height="39" fill="#fff" stroke="{INK}"/><svg x="7" y="7" width="26" height="26" viewBox="0 0 24 24" fill="{INK}">{inner}</svg></svg>\n')
 
 # ---------- clients ----------
-LOGOS = Path(__file__).resolve().parent / "logos"
-
 def logo(fname, x, y, size=34):
     """Inline a real logo (no external reference, so it renders everywhere, GitHub included)."""
     if not fname:
