@@ -12,28 +12,28 @@
 <img src="https://img.shields.io/badge/Haiku-F58220" alt="Haiku">
 </p>
 
-**smugBrain** is a brain upgrade that is, frankly, better than yours. Plain Markdown notes plus one small binary (`smug`) that lets your agents (Claude Code, Codex, Hermes) remember what you did yesterday and never overwrite your notes by accident. No account. No cloud. Nothing to compile.
+**smugBrain** is a brain upgrade that is, frankly, better than yours. Plain Markdown notes plus one small binary (`smug`) that gives your agents (Claude Code, Codex, Hermes) a memory that knows where every fact came from, notices when a decision has been replaced, and shows you what a change will break **before** it happens. No account. No cloud. Nothing to compile.
 
 ## Install
 
-Grab a prebuilt binary from the **[Releases page](https://github.com/OnurByte/smugbrain/releases/latest)**, or paste one line. The installer checks the SHA-256 before it installs anything.
+Prebuilt binaries are on the **[Releases page](https://github.com/OnurByte/smugbrain/releases/latest)**. Or paste one line; the installer checks the SHA-256 before it installs anything.
 
-macOS and Linux (x86-64, ARM):
+macOS, Linux (x86-64, ARM) and Haiku:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
+```
+
+FreeBSD (uses the built-in `fetch`; with `curl` installed the line above works too):
+
+```bash
+fetch -qo - https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
 irm https://raw.githubusercontent.com/OnurByte/smugbrain/main/install.ps1 | iex
-```
-
-FreeBSD and Haiku have no prebuilt binary yet. With Rust installed:
-
-```bash
-cargo install --git https://github.com/OnurByte/smugbrain
 ```
 
 Then:
@@ -44,18 +44,27 @@ cd my-brain
 smug setup claude         # Claude Code starts every session with your memory
 ```
 
-## Use
+## What it does
 
 ```bash
-smug search rust karar                       # find notes (persistent index, ~12 ms)
-smug context                                 # what an agent should read first
-smug write note.md --expect new < text       # atomic write; --expect <sha256> refuses if the file changed
-smug backup                                  # scan staged files, commit, push; stops on any secret
-smug doctor                                  # health check + crash recovery
-smug log                                     # write history
+smug search rust karar                 # find notes; replaced decisions never come back
+smug decide postgres --source adr-7 --topic db < why.txt    # a decision, with its source
+smug check postgres                    # CURRENT / STALE / CONFLICTED / UNSUPPORTED
+smug fail retry-loop --method "retry forever" --reason "hammered the API" < /dev/null
+smug warn "let's retry forever"        # it has failed before, here is why
+smug at 2026-11-03 database            # what was valid and known on that day
 ```
 
-`write` has no blind mode unless you pass `--force`. It refuses paths outside the vault, symlinks anywhere on the path, and content that looks like a key or recovery phrase.
+**Change a decision safely**
+
+```bash
+smug patch postgres --new-id cockroach --source adr-9 < why.txt   # proposes, applies nothing
+smug impact postgres                   # every note that depends on it
+smug eval 1                            # your questions, before and after the patch
+smug apply 1                           # refuses if a question that passed now fails
+```
+
+Everyday safety: `smug write note.md --expect <sha256|new>` (atomic; refuses if the file changed under you), `smug backup` (scans exactly what is staged, stops on any secret), `smug doctor` (health check and crash recovery), `smug bench` (recall, MRR and latency on your own cases). Full list: `smug` with no arguments.
 
 ## Numbers
 
@@ -65,19 +74,19 @@ smug log                                     # write history
 
 <p align="center"><img src="assets/card-compare.svg" alt="How we compare" width="880"></p>
 
-## Status
+## Under the hood
 
-| Done in v0.2 | Not done |
-| --- | --- |
-| Hash-checked writes, required by default | Memory Patch / impact / eval commands |
-| OS-level lock (cannot go stale) | Source, claim and decision data model |
-| Symlink-safe, path-escape-safe writes | Semantic search (QMD) behind keyword search |
-| Persistent search index | Write history stored in git (it lives in `.smug/` for now) |
-| Backup scans exactly what is staged | Real Codex and Hermes hooks (Codex reads `AGENTS.md`) |
-| Claude Code session-start hook | Prebuilt FreeBSD and Haiku binaries |
-| Tested on Linux, macOS, Windows in CI | Independent benchmark |
+One Rust binary. Your notes are Markdown. State is [redb](https://github.com/cberner/redb), search is [Tantivy](https://github.com/quickwit-oss/tantivy) (lower-cased and ASCII-folded, so `isik` finds `ışık`). Every write is journalled to `history/events.jsonl`, which lives in git: delete `.smug/` and nothing is lost. No SQLite, no C library, no server.
 
-Plan: [docs/roadmap.md](docs/roadmap.md).
+## What is not done
+
+- Semantic search is not built in. `smug search --deep` hands the query to [QMD](https://github.com/tobi/qmd) if you have it.
+- `eval` checks what retrieval returns for your questions, not what a model answers. There is no model-in-the-loop test yet.
+- The benchmark is self-run on your own cases. There is no independent benchmark.
+- Codex and Hermes have no native lifecycle hooks in smug; Codex follows `AGENTS.md`, Hermes calls the commands.
+- Feedback on which notes helped is manual (`smug feedback`).
+
+Plan and status: [docs/roadmap.md](docs/roadmap.md).
 
 ## License
 
